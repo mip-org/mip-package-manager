@@ -32,10 +32,6 @@ jobs:
         with:
           cache: true
       
-      # verify that matlab command is available
-      - name: Verify MATLAB installation
-        run: matlab -batch "disp('MATLAB is installed and available')"
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -52,6 +48,14 @@ jobs:
 
       - name: Run build_flam.py
         run: python scripts/build_flam.py
+
+      - name: Clone kdtree repository
+        run: git clone https://github.com/taiya/kdtree.git
+
+      - name: Compile kdtree MEX files
+        uses: matlab-actions/run-command@v2
+        with:
+          command: cd('kdtree/toolbox'); kdtree_compile;
 
       - name: Run build_kdtree.py
         run: python scripts/build_kdtree.py

@@ -38,30 +38,15 @@ def collect_kdtree_symbols(toolbox_dir):
     return symbols
 
 def main():
-    repo_url = "https://github.com/taiya/kdtree.git"
+    # Assume kdtree repository is already cloned and MEX files are compiled
+    # This script only handles packaging
     clone_dir = "kdtree"
     # Follow Python wheel naming convention: {package}-{version}-{matlab_tag}-{abi_tag}-{platform_tag}.mhl
     output_file = "kdtree-latest-any-none-any.mhl"
     
-    # Remove clone directory if it exists
-    if os.path.exists(clone_dir):
-        print(f"Removing existing {clone_dir} directory...")
-        shutil.rmtree(clone_dir)
-    
-    # Clone the repository
-    print(f"Cloning {repo_url}...")
-    subprocess.run(
-        ["git", "clone", repo_url],
-        check=True
-    )
-    
-    # Remove .git directories to reduce size
-    print("Removing .git directories...")
-    for root, dirs, files in os.walk(clone_dir):
-        if ".git" in dirs:
-            git_dir = os.path.join(root, ".git")
-            shutil.rmtree(git_dir)
-            dirs.remove(".git")
+    # Verify clone directory exists
+    if not os.path.exists(clone_dir):
+        raise FileNotFoundError(f"{clone_dir} directory not found. Make sure the repository is cloned first.")
     
     # Create a temporary directory for building the .mhl
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -70,25 +55,11 @@ def main():
         os.makedirs(mhl_build_dir)
         
         # Copy toolbox directory to kdtree directory
+        # MEX files should already be compiled at this point
         toolbox_src = os.path.join(clone_dir, "toolbox")
         kdtree_dest = os.path.join(mhl_build_dir, "kdtree")
-        print(f"Copying toolbox directory to kdtree...")
+        print(f"Copying toolbox directory (with pre-compiled MEX files) to kdtree...")
         shutil.copytree(toolbox_src, kdtree_dest)
-        
-        # Compile MEX files using kdtree_compile.m
-        print("Compiling MEX files using kdtree_compile.m...")
-        # Run MATLAB in the kdtree directory
-        result = subprocess.run(
-            ["matlab", "-batch", "kdtree_compile"],
-            cwd=kdtree_dest,
-            capture_output=True,
-            text=True
-        )
-        if result.returncode != 0:
-            print("MATLAB stdout:", result.stdout)
-            print("MATLAB stderr:", result.stderr)
-            raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
-        print("MEX compilation completed successfully")
         
         # Collect exposed symbols from kdtree directory (including .cpp files)
         print("Collecting exposed symbols...")
