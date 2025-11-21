@@ -17,7 +17,9 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # we need to compile mex on an older system so that the binaries are compatible with more matlab installations
+    # runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
