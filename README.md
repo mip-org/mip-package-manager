@@ -1,5 +1,7 @@
 # mip
 
+> **⚠️ Warning**: This project is at a very early stage of development and is subject to breaking changes.
+
 A simple pip-style package manager for MATLAB packages.
 
 ## Installation
