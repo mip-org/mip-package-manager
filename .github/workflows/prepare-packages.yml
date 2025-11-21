@@ -38,11 +38,15 @@ jobs:
       - name: Run prepare_export_fig.py
         run: python scripts/prepare_export_fig.py
 
+      - name: Run prepare_surfacefun.py
+        run: python scripts/prepare_surfacefun.py
+
       - name: Create packages directory
         run: |
           mkdir -p packages
           mv chebfun.zip packages/
           mv export_fig.zip packages/
+          mv surfacefun.zip packages/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
