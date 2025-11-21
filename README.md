@@ -17,10 +17,15 @@ cd mip
 pip install -e .
 ```
 
+To set up the MATLAB integration, run:
 
-## Setup MATLAB Path
+```bash
+mip setup
+```
 
-Add `~/.mip/matlab` to your MATLAB path permanently. You can do this in MATLAB:
+This command will create the necessary directories and files in `~/.mip/matlab` for MATLAB integration.
+
+Then add `~/.mip/matlab` to your MATLAB path permanently. You can do this in MATLAB:
 
 ```matlab
 addpath('~/.mip/matlab')
@@ -45,27 +50,11 @@ mip install package_name
 
 Downloads and installs a package from `https://magland.github.io/mip/package_name-*.mhl` to `~/.mip/packages/package_name`.
 
-### Uninstall a package
-
-```bash
-mip uninstall package_name
-```
-
-Removes an installed package after confirmation.
-
 Currently, the supported packages are:
 - [export_fig](https://github.com/altmany/export_fig)
 - [chebfun](https://github.com/chebfun/chebfun)
 - [surfacefun](https://github.com/danfortunato/surfacefun) - depends on chebfun
 - [FLAM](https://github.com/klho/FLAM)
-
-### List installed packages
-
-```bash
-mip list
-```
-
-Shows all currently installed packages.
 
 ### Using packages in MATLAB
 
@@ -78,13 +67,30 @@ mip.import('package_name')
 % Now you can use the package functions
 ```
 
-## Package Structure
+### List installed packages
+
+```bash
+mip list
+```
+
+Shows all currently installed packages.
+
+### Uninstall a package
+
+```bash
+mip uninstall package_name
+```
+
+Removes an installed package after confirmation.
+
+## Internal Package Structure
 
 - Packages are stored in `~/.mip/packages/`
 - Each package is extracted from a zip (.mhl) file into its own directory
+- Each package has a `mip.json` file containing metadata such as dependencies and a `setup.m` that gets called on import
 - The `+mip` MATLAB namespace is installed in `~/.mip/matlab/+mip/`
 
-## Examples
+## Example
 
 ```bash
 # Install a package
@@ -101,6 +107,10 @@ matlab
 # Uninstall
 mip uninstall surfacefun
 ```
+
+## How to add new packages
+
+For now mip supports a very limited set of packages, which are built as part of this repository and hosted on GitHub Pages. To add a new package, you need to submit a pull request with a new script in `scripts/` and also modify the `.github/workflows/prepare-packages.yml` file to include the new package in the build process. Once your pull request is merged, your package will be automatically built and hosted.
 
 ## Requirements
 
