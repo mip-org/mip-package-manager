@@ -5,6 +5,7 @@ import shutil
 import sys
 import subprocess
 import zipfile
+import json
 from pathlib import Path
 from urllib import request
 from urllib.error import URLError, HTTPError
@@ -16,8 +17,22 @@ def get_mip_dir():
     return home / '.mip' / 'packages'
 
 
-def install_package(package_name):
-    """Install a package from the mip repository"""
+def install_package(package_name, _installing_stack=None):
+    """Install a package from the mip repository
+    
+    Args:
+        package_name: Name of the package to install
+        _installing_stack: Internal parameter to track installation chain for circular dependency detection
+    """
+    if _installing_stack is None:
+        _installing_stack = []
+    
+    # Check for circular dependencies
+    if package_name in _installing_stack:
+        cycle = ' -> '.join(_installing_stack + [package_name])
+        print(f"Error: Circular dependency detected: {cycle}")
+        sys.exit(1)
+    
     mip_dir = get_mip_dir()
     package_dir = mip_dir / package_name
     
@@ -25,6 +40,9 @@ def install_package(package_name):
     if package_dir.exists():
         print(f"Package '{package_name}' is already installed")
         return
+    
+    # Add to installation stack for circular dependency detection
+    _installing_stack.append(package_name)
     
     # Try to download the package
     url = f"https://magland.github.io/mip/{package_name}.zip"
@@ -45,6 +63,23 @@ def install_package(package_name):
         
         # Clean up zip file
         zip_path.unlink()
+        
+        # Check for dependencies in mip.json
+        mip_json_path = package_dir / "mip.json"
+        if mip_json_path.exists():
+            try:
+                with open(mip_json_path, 'r') as f:
+                    mip_config = json.load(f)
+                
+                dependencies = mip_config.get('dependencies', [])
+                if dependencies:
+                    print(f"Installing dependencies for '{package_name}': {', '.join(dependencies)}")
+                    for dep in dependencies:
+                        install_package(dep, _installing_stack.copy())
+            except json.JSONDecodeError as e:
+                print(f"Warning: Could not parse mip.json for '{package_name}': {e}")
+            except Exception as e:
+                print(f"Warning: Error processing dependencies for '{package_name}': {e}")
         
         print(f"Successfully installed '{package_name}'")
         

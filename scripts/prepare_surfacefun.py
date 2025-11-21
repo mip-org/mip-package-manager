@@ -2,6 +2,7 @@
 import subprocess
 import shutil
 import os
+import json
 
 def main():
     repo_url = "https://github.com/danfortunato/surfacefun.git"
@@ -27,6 +28,15 @@ def main():
             git_dir = os.path.join(root, ".git")
             shutil.rmtree(git_dir)
             dirs.remove(".git")
+    
+    # Create mip.json with dependencies
+    print("Creating mip.json with dependencies...")
+    mip_json_path = os.path.join(clone_dir, "mip.json")
+    mip_config = {
+        "dependencies": ["chebfun"]
+    }
+    with open(mip_json_path, 'w') as f:
+        json.dump(mip_config, f, indent=2)
     
     # Create zip file
     print(f"Creating {output_file}...")

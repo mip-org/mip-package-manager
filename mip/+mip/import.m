@@ -1,4 +1,4 @@
-function import(packageName)
+function import(packageName, varargin)
     % import - Import a mip package into MATLAB path
     %
     % Usage:
@@ -6,6 +6,22 @@ function import(packageName)
     %
     % This function adds the specified package from ~/.mip/packages to the
     % MATLAB path for the current session only.
+    
+    % Parse optional arguments for internal use
+    p = inputParser;
+    addParameter(p, 'importingStack', {}, @iscell);
+    parse(p, varargin{:});
+    importingStack = p.Results.importingStack;
+    
+    % Check for circular dependencies
+    if ismember(packageName, importingStack)
+        cycle = strjoin([importingStack, {packageName}], ' -> ');
+        error('mip:circularDependency', ...
+              'Circular dependency detected: %s', cycle);
+    end
+    
+    % Add to importing stack for circular dependency detection
+    importingStack = [importingStack, {packageName}];
     
     % Get the mip packages directory
     homeDir = getenv('HOME');
@@ -36,6 +52,43 @@ function import(packageName)
         actualPackageDir = mipDir;
     end
     
+    % Check for mip.json and process dependencies
+    mipJsonPath = fullfile(actualPackageDir, 'mip.json');
+    if exist(mipJsonPath, 'file')
+        try
+            % Read and parse mip.json
+            fid = fopen(mipJsonPath, 'r');
+            jsonText = fread(fid, '*char')';
+            fclose(fid);
+            mipConfig = jsondecode(jsonText);
+            
+            % Import dependencies first
+            if isfield(mipConfig, 'dependencies') && ~isempty(mipConfig.dependencies)
+                fprintf('Importing dependencies for "%s": %s\n', ...
+                        packageName, strjoin(mipConfig.dependencies, ', '));
+                for i = 1:length(mipConfig.dependencies)
+                    dep = mipConfig.dependencies{i};
+                    % Check if already on path to avoid duplicate imports
+                    if ~isPackageOnPath(dep)
+                        mip.import(dep, 'importingStack', importingStack);
+                    else
+                        fprintf('  Dependency "%s" is already imported\n', dep);
+                    end
+                end
+            end
+        catch ME
+            warning('mip:jsonParseError', ...
+                    'Could not parse mip.json for package "%s": %s', ...
+                    packageName, ME.message);
+        end
+    end
+    
+    % Check if package is already on path
+    if isPackageOnPath(packageName)
+        fprintf('Package "%s" is already imported\n', packageName);
+        return;
+    end
+    
     % Add to path (current session only)
     addpath(actualPackageDir);
     fprintf('Added "%s" to MATLAB path\n', actualPackageDir);
@@ -54,7 +107,36 @@ function import(packageName)
                     'Error executing setup.m for package "%s": %s', ...
                     packageName, ME.message);
         end
+        cd(originalDir);
     end
-    % Return to original directory
-    cd(originalDir);
+end
+
+function onPath = isPackageOnPath(packageName)
+    % Helper function to check if a package is already on the MATLAB path
+    homeDir = getenv('HOME');
+    if isempty(homeDir)
+        homeDir = getenv('USERPROFILE');
+    end
+    
+    mipDir = fullfile(homeDir, '.mip', 'packages', packageName);
+    
+    % Check if package exists
+    if ~exist(mipDir, 'dir')
+        onPath = false;
+        return;
+    end
+    
+    % Check for nested directory structure
+    contents = dir(mipDir);
+    contents = contents(~ismember({contents.name}, {'.', '..'}));
+    
+    if length(contents) == 1 && contents(1).isdir
+        actualPackageDir = fullfile(mipDir, contents(1).name);
+    else
+        actualPackageDir = mipDir;
+    end
+    
+    % Check if this directory is on the path
+    pathDirs = strsplit(path, pathsep);
+    onPath = any(strcmp(actualPackageDir, pathDirs));
 end
