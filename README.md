@@ -1,20 +1,20 @@
 # mip
 
-A simple command-line package manager for MATLAB packages.
+A simple pip-style package manager for MATLAB packages.
 
 ## Installation
 
 Install the package using pip:
 
 ```bash
+# First, clone the repository
+git clone https://github.com/magland/mip.git
+cd mip
+
+# Then, install the package
 pip install -e .
 ```
 
-Or if you want to install it for development:
-
-```bash
-pip install --editable .
-```
 
 ## Setup
 
