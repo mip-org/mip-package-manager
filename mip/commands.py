@@ -199,8 +199,79 @@ def install_package(package_name):
         sys.exit(1)
 
 
+def _read_package_dependencies(package_dir):
+    """Read dependencies from a package's mip.json file
+    
+    Args:
+        package_dir: Path to the package directory
+    
+    Returns:
+        List of dependency package names, or empty list if no dependencies or error
+    """
+    mip_json_path = package_dir / 'mip.json'
+    
+    if not mip_json_path.exists():
+        return []
+    
+    try:
+        with open(mip_json_path, 'r') as f:
+            mip_config = json.load(f)
+        
+        dependencies = mip_config.get('dependencies', [])
+        return dependencies if isinstance(dependencies, list) else []
+    except Exception as e:
+        print(f"Warning: Could not read mip.json for {package_dir.name}: {e}")
+        return []
+
+def _find_reverse_dependencies(package_name, mip_dir, visited=None):
+    """Find all packages that depend on the given package (recursively)
+    
+    Args:
+        package_name: Name of the package to find reverse dependencies for
+        mip_dir: The mip directory path
+        visited: Set of already visited packages (for recursion)
+    
+    Returns:
+        List of package names that depend on the given package (directly or indirectly)
+    """
+    if visited is None:
+        visited = set()
+    
+    # Avoid infinite recursion
+    if package_name in visited:
+        return []
+    
+    visited.add(package_name)
+    reverse_deps = []
+    
+    # Scan all installed packages
+    if not mip_dir.exists():
+        return []
+    
+    for pkg_dir in mip_dir.iterdir():
+        if not pkg_dir.is_dir():
+            continue
+        
+        pkg_name = pkg_dir.name
+        
+        # Skip the package itself
+        if pkg_name == package_name:
+            continue
+        
+        # Read this package's dependencies
+        dependencies = _read_package_dependencies(pkg_dir)
+        
+        # If this package depends on our target package
+        if package_name in dependencies:
+            reverse_deps.append(pkg_name)
+            # Recursively find packages that depend on this package
+            transitive_deps = _find_reverse_dependencies(pkg_name, mip_dir, visited)
+            reverse_deps.extend(transitive_deps)
+    
+    return reverse_deps
+
 def uninstall_package(package_name):
-    """Uninstall a package"""
+    """Uninstall a package and all packages that depend on it"""
     # Ensure MATLAB integration is up to date
     _ensure_mip_matlab_setup()
     
@@ -212,19 +283,61 @@ def uninstall_package(package_name):
         print(f"Package '{package_name}' is not installed")
         return
     
+    # Find all packages that depend on this package
+    print(f"Scanning for packages that depend on '{package_name}'...")
+    reverse_deps = _find_reverse_dependencies(package_name, mip_dir)
+    
+    # Build the complete uninstall list
+    to_uninstall = []
+    
+    # Add reverse dependencies first (they need to be uninstalled before their dependencies)
+    if reverse_deps:
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_reverse_deps = []
+        for dep in reverse_deps:
+            if dep not in seen:
+                seen.add(dep)
+                unique_reverse_deps.append(dep)
+        to_uninstall.extend(unique_reverse_deps)
+    
+    # Add the target package last
+    to_uninstall.append(package_name)
+    
+    # Display uninstallation plan
+    if len(to_uninstall) > 1:
+        print(f"\nThe following packages will be uninstalled:")
+        for pkg in to_uninstall:
+            if pkg == package_name:
+                print(f"  - {pkg}")
+            else:
+                print(f"  - {pkg} (depends on {package_name})")
+        print()
+    
     # Confirm uninstallation
-    response = input(f"Are you sure you want to uninstall '{package_name}'? (y/n): ")
+    if len(to_uninstall) == 1:
+        response = input(f"Are you sure you want to uninstall '{package_name}'? (y/n): ")
+    else:
+        response = input(f"Are you sure you want to uninstall these {len(to_uninstall)} packages? (y/n): ")
+    
     if response.lower() not in ['y', 'yes']:
         print("Uninstallation cancelled")
         return
     
-    # Remove the package directory
-    try:
-        shutil.rmtree(package_dir)
-        print(f"Successfully uninstalled '{package_name}'")
-    except Exception as e:
-        print(f"Error: Failed to uninstall package '{package_name}': {e}")
-        sys.exit(1)
+    # Uninstall all packages
+    print()
+    for pkg in to_uninstall:
+        pkg_dir = mip_dir / pkg
+        if pkg_dir.exists():
+            try:
+                print(f"Uninstalling '{pkg}'...")
+                shutil.rmtree(pkg_dir)
+                print(f"Successfully uninstalled '{pkg}'")
+            except Exception as e:
+                print(f"Error: Failed to uninstall package '{pkg}': {e}")
+                sys.exit(1)
+    
+    print(f"\nSuccessfully uninstalled {len(to_uninstall)} package(s)")
 
 
 def list_packages():
