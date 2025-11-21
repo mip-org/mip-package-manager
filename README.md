@@ -73,18 +73,18 @@ mip.import('package_name')
 
 ```bash
 # Install a package
-mip install my_matlab_toolbox
+mip install surfacefun
 
 # List installed packages
 mip list
 
 # Use in MATLAB
 matlab
->> mip.import('my_matlab_toolbox')
+>> mip.import('surfacefun')
 >> % Now use the toolbox functions
 
 # Uninstall when done
-mip uninstall my_matlab_toolbox
+mip uninstall surfacefun
 ```
 
 ## Requirements

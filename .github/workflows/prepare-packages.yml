@@ -41,12 +41,16 @@ jobs:
       - name: Run prepare_surfacefun.py
         run: python scripts/prepare_surfacefun.py
 
+      - name: Run prepare_flam.py
+        run: python scripts/prepare_flam.py
+
       - name: Create packages directory
         run: |
           mkdir -p packages
           mv chebfun.zip packages/
           mv export_fig.zip packages/
           mv surfacefun.zip packages/
+          mv flam.zip packages/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

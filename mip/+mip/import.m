@@ -109,6 +109,24 @@ function import(packageName, varargin)
         end
         cd(originalDir);
     end
+
+    % Check for a startup.m file
+    % If it exists, change to that directory, run startup, then return
+    startupFile = fullfile(actualPackageDir, 'startup.m');
+    if exist(startupFile, 'file')
+        originalDir = pwd;
+        cd(actualPackageDir);
+        try
+            startup;  % Call the startup function
+            fprintf('Executed startup.m for package "%s"\n', packageName);
+        catch ME
+            warning('mip:startupError', ...
+                    'Error executing startup.m for package "%s": %s', ...
+                    packageName, ME.message);
+        end
+        cd(originalDir);
+    end
+
 end
 
 function onPath = isPackageOnPath(packageName)
