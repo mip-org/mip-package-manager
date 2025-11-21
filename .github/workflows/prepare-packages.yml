@@ -32,17 +32,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Run prepare_chebfun.py
-        run: python scripts/prepare_chebfun.py
+      - name: Run build_chebfun.py
+        run: python scripts/build_chebfun.py
 
-      - name: Run prepare_export_fig.py
-        run: python scripts/prepare_export_fig.py
+      - name: Run build_export_fig.py
+        run: python scripts/build_export_fig.py
 
-      - name: Run prepare_surfacefun.py
-        run: python scripts/prepare_surfacefun.py
+      - name: Run build_surfacefun.py
+        run: python scripts/build_surfacefun.py
 
-      - name: Run prepare_flam.py
-        run: python scripts/prepare_flam.py
+      - name: Run build_flam.py
+        run: python scripts/build_flam.py
 
       - name: Create deploy directory structure
         run: |
