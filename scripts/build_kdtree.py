@@ -77,11 +77,18 @@ def main():
         
         # Compile MEX files using kdtree_compile.m
         print("Compiling MEX files using kdtree_compile.m...")
-        compile_command = f"cd('{kdtree_dest}'); kdtree_compile"
-        subprocess.run(
-            ["matlab", "-batch", compile_command],
-            check=True
+        # Run MATLAB in the kdtree directory
+        result = subprocess.run(
+            ["matlab", "-batch", "kdtree_compile"],
+            cwd=kdtree_dest,
+            capture_output=True,
+            text=True
         )
+        if result.returncode != 0:
+            print("MATLAB stdout:", result.stdout)
+            print("MATLAB stderr:", result.stderr)
+            raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
+        print("MEX compilation completed successfully")
         
         # Collect exposed symbols from kdtree directory (including .cpp files)
         print("Collecting exposed symbols...")
