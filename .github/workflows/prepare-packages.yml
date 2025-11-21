@@ -30,7 +30,6 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
-          release: R2024a
           cache: true
       
       # verify that matlab command is available
