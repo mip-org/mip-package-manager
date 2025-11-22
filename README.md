@@ -1,4 +1,4 @@
-# mip
+# mip-client
 
 > **⚠️ Warning**: This project is at a very early stage of development and is subject to breaking changes.
 
@@ -9,8 +9,14 @@ A simple pip-style package manager for MATLAB packages.
 Install the package using pip:
 
 ```bash
+pip install mip-client
+```
+
+Or install from source:
+
+```bash
 # First, clone the repository
-git clone https://github.com/magland/mip.git
+git clone https://github.com/mip-org/mip.git
 cd mip
 
 # Then, install the package

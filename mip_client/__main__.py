@@ -1,4 +1,4 @@
-"""CLI entry point for mip"""
+"""CLI entry point for mip-client"""
 
 import sys
 from .commands import install_package, uninstall_package, list_packages, setup_matlab, find_name_collisions

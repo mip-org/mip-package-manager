@@ -1,0 +1,4 @@
+include README.md
+include LICENSE
+recursive-include mip_client *.py *.m
+recursive-include scripts *.py *.m
