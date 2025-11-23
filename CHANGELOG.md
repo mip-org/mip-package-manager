@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.1.3] - 2025-11-22
+
 - Moved +mip and mip.m in source tree to matlab/+mip and matlab/mip.m
 - In import.m, determine location of packages directory relative to location of current script file
 - Allow installing multiple packages at once via `mip install package1 package2 ...`
