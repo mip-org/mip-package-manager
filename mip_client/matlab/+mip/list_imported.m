@@ -6,10 +6,11 @@ function list_imported()
     %
     % This function displays all currently imported packages, distinguishing
     % between packages directly imported by the user and those imported
-    % as dependencies.
+    % as dependencies. Pinned packages are marked with a pin symbol.
     
     global MIP_IMPORTED_PACKAGES;
     global MIP_DIRECTLY_IMPORTED_PACKAGES;
+    global MIP_PINNED_PACKAGES;
     
     % Initialize if empty
     if isempty(MIP_IMPORTED_PACKAGES)
@@ -17,6 +18,9 @@ function list_imported()
     end
     if isempty(MIP_DIRECTLY_IMPORTED_PACKAGES)
         MIP_DIRECTLY_IMPORTED_PACKAGES = {};
+    end
+    if isempty(MIP_PINNED_PACKAGES)
+        MIP_PINNED_PACKAGES = {};
     end
     
     % Check if any packages are imported
@@ -32,7 +36,12 @@ function list_imported()
     if ~isempty(MIP_DIRECTLY_IMPORTED_PACKAGES)
         fprintf('Directly imported packages:\n');
         for i = 1:length(MIP_DIRECTLY_IMPORTED_PACKAGES)
-            fprintf('  * %s\n', MIP_DIRECTLY_IMPORTED_PACKAGES{i});
+            pkg = MIP_DIRECTLY_IMPORTED_PACKAGES{i};
+            if ismember(pkg, MIP_PINNED_PACKAGES)
+                fprintf('  * %s [PINNED]\n', pkg);
+            else
+                fprintf('  * %s\n', pkg);
+            end
         end
         fprintf('\n');
     end
@@ -50,15 +59,22 @@ function list_imported()
     if ~isempty(dependencyPackages)
         fprintf('Imported as dependencies:\n');
         for i = 1:length(dependencyPackages)
-            fprintf('  - %s\n', dependencyPackages{i});
+            pkg = dependencyPackages{i};
+            if ismember(pkg, MIP_PINNED_PACKAGES)
+                fprintf('  - %s [PINNED]\n', pkg);
+            else
+                fprintf('  - %s\n', pkg);
+            end
         end
         fprintf('\n');
     end
     
     % Summary
-    fprintf('Total: %d package(s) imported (%d direct, %d dependencies)\n', ...
+    numPinned = length(MIP_PINNED_PACKAGES);
+    fprintf('Total: %d package(s) imported (%d direct, %d dependencies, %d pinned)\n', ...
             length(MIP_IMPORTED_PACKAGES), ...
             length(MIP_DIRECTLY_IMPORTED_PACKAGES), ...
-            length(dependencyPackages));
+            length(dependencyPackages), ...
+            numPinned);
     fprintf('\n');
 end

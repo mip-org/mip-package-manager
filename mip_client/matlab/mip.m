@@ -2,17 +2,23 @@ function varargout = mip(command, varargin)
     % mip - MATLAB Interface for mip Package Manager
     %
     % Usage:
-    %   mip import <package>       - Import a package
-    %   mip unimport <package>     - Unimport a package
-    %   mip install <package>      - Install a package
-    %   mip uninstall <package>    - Uninstall a package
-    %   mip list-imported          - List currently imported packages
-    %   mip list                   - List installed packages
-    %   mip setup                  - Set up MATLAB integration
-    %   mip find-name-collisions   - Find symbol name collisions
+    %   mip import <package> [--pin]  - Import a package (optionally pin it)
+    %   mip unimport <package>        - Unimport a package
+    %   mip unimport --all            - Unimport all non-pinned packages
+    %   mip pin <package>             - Pin an imported package
+    %   mip unpin <package>           - Unpin a package
+    %   mip install <package>         - Install a package
+    %   mip uninstall <package>       - Uninstall a package
+    %   mip list-imported             - List currently imported packages
+    %   mip list                      - List installed packages
+    %   mip setup                     - Set up MATLAB integration
+    %   mip find-name-collisions      - Find symbol name collisions
     %
     % Examples:
     %   mip import mypackage
+    %   mip import mypackage --pin
+    %   mip pin mypackage
+    %   mip unimport --all
     %   mip install mypackage
     %   mip uninstall mypackage
     %   mip list
@@ -37,9 +43,34 @@ function varargout = mip(command, varargin)
         if nargin < 2
             error('mip:noPackage', 'No package specified for unimport command.');
         end
+        % Check for --all flag
+        if strcmp(varargin{1}, '--all')
+            mip.unimport('--all');
+        else
+            packageName = varargin{1};
+            % Call mip.unimport with the package name
+            mip.unimport(packageName);
+        end
+        return;
+    end
+
+    % Handle 'pin' command by calling mip.pin
+    if strcmp(command, 'pin')
+        if nargin < 2
+            error('mip:noPackage', 'No package specified for pin command.');
+        end
         packageName = varargin{1};
-        % Call mip.unimport with the package name
-        mip.unimport(packageName);
+        mip.pin(packageName);
+        return;
+    end
+
+    % Handle 'unpin' command by calling mip.unpin
+    if strcmp(command, 'unpin')
+        if nargin < 2
+            error('mip:noPackage', 'No package specified for unpin command.');
+        end
+        packageName = varargin{1};
+        mip.unpin(packageName);
         return;
     end
 

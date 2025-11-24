@@ -3,19 +3,35 @@ function unimport(packageName)
     %
     % Usage:
     %   mip.unimport('packageName')
+    %   mip.unimport('--all')
     %
     % This function unimports the specified package by executing its 
     % unsetup.m file (if it exists) and then prunes any packages that
     % are no longer needed (packages that were imported as dependencies
     % but are not dependencies of any directly imported package).
+    %
+    % Use '--all' to unimport all non-pinned packages.
     
     global MIP_IMPORTED_PACKAGES;
     global MIP_DIRECTLY_IMPORTED_PACKAGES;
+    global MIP_PINNED_PACKAGES;
+    
+    % Handle --all flag
+    if strcmp(packageName, '--all')
+        unimportAll();
+        return;
+    end
     
     % Check if package is imported
     if ~isPackageImported(packageName)
         fprintf('Package "%s" is not currently imported\n', packageName);
         return;
+    end
+    
+    % Warn if package is pinned
+    if isPackagePinned(packageName)
+        warning('mip:pinnedPackage', ...
+                'Package "%s" is pinned. It will be unimported anyway.', packageName);
     end
     
     % Get the mip packages directory
@@ -26,6 +42,12 @@ function unimport(packageName)
     
     % Execute unsetup.m if it exists
     executeUnsetup(packageDir, packageName);
+    
+    % Remove from pinned packages if it was pinned
+    if ~isempty(MIP_PINNED_PACKAGES)
+        MIP_PINNED_PACKAGES = MIP_PINNED_PACKAGES(...
+            ~strcmp(MIP_PINNED_PACKAGES, packageName));
+    end
     
     % Remove from directly imported packages
     if ~isempty(MIP_DIRECTLY_IMPORTED_PACKAGES)
@@ -161,6 +183,71 @@ function deps = getAllDependencies(packageName, packagesDir)
     end
 end
 
+function unimportAll()
+    % Unimport all non-pinned packages
+    global MIP_IMPORTED_PACKAGES;
+    global MIP_PINNED_PACKAGES;
+    
+    if isempty(MIP_IMPORTED_PACKAGES)
+        fprintf('No packages are currently imported\n');
+        return;
+    end
+    
+    if isempty(MIP_PINNED_PACKAGES)
+        MIP_PINNED_PACKAGES = {};
+    end
+    
+    % Get the mip packages directory
+    importFileDir = fileparts(mfilename('fullpath'));
+    mipRootDir = fileparts(fileparts(importFileDir));
+    packagesDir = fullfile(mipRootDir, 'packages');
+    
+    % Find packages to unimport (all except pinned)
+    packagesToUnimport = {};
+    for i = 1:length(MIP_IMPORTED_PACKAGES)
+        pkg = MIP_IMPORTED_PACKAGES{i};
+        if ~ismember(pkg, MIP_PINNED_PACKAGES)
+            packagesToUnimport{end+1} = pkg;
+        end
+    end
+    
+    if isempty(packagesToUnimport)
+        fprintf('No non-pinned packages to unimport\n');
+        if ~isempty(MIP_PINNED_PACKAGES)
+            fprintf('Pinned packages remain: %s\n', strjoin(MIP_PINNED_PACKAGES, ', '));
+        end
+        return;
+    end
+    
+    fprintf('Unimporting all non-pinned packages: %s\n', strjoin(packagesToUnimport, ', '));
+    
+    % Unimport each package
+    for i = 1:length(packagesToUnimport)
+        pkg = packagesToUnimport{i};
+        packageDir = fullfile(packagesDir, pkg);
+        
+        % Execute unsetup.m
+        executeUnsetup(packageDir, pkg);
+        fprintf('  Unimported package "%s"\n', pkg);
+    end
+    
+    % Update global variables - remove all non-pinned packages
+    global MIP_DIRECTLY_IMPORTED_PACKAGES;
+    
+    % Keep only pinned packages in imported list
+    MIP_IMPORTED_PACKAGES = MIP_PINNED_PACKAGES;
+    
+    % Keep only pinned packages in directly imported list
+    if ~isempty(MIP_DIRECTLY_IMPORTED_PACKAGES)
+        MIP_DIRECTLY_IMPORTED_PACKAGES = MIP_DIRECTLY_IMPORTED_PACKAGES(...
+            ismember(MIP_DIRECTLY_IMPORTED_PACKAGES, MIP_PINNED_PACKAGES));
+    end
+    
+    if ~isempty(MIP_PINNED_PACKAGES)
+        fprintf('\nPinned packages remain imported: %s\n', strjoin(MIP_PINNED_PACKAGES, ', '));
+    end
+end
+
 function imported = isPackageImported(packageName)
     % Helper function to check if a package has already been imported
     global MIP_IMPORTED_PACKAGES;
@@ -168,4 +255,13 @@ function imported = isPackageImported(packageName)
         MIP_IMPORTED_PACKAGES = {};
     end
     imported = ismember(packageName, MIP_IMPORTED_PACKAGES);
+end
+
+function pinned = isPackagePinned(packageName)
+    % Helper function to check if a package is pinned
+    global MIP_PINNED_PACKAGES;
+    if isempty(MIP_PINNED_PACKAGES)
+        MIP_PINNED_PACKAGES = {};
+    end
+    pinned = ismember(packageName, MIP_PINNED_PACKAGES);
 end

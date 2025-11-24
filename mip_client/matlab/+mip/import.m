@@ -3,15 +3,27 @@ function import(packageName, varargin)
     %
     % Usage:
     %   mip.import('packageName')
+    %   mip.import('packageName', '--pin')
     %
     % This function imports the specified package from ~/.mip/packages by
-    % executing its setup.m file.
+    % executing its setup.m file. Use '--pin' to automatically pin the package.
+    
+    % Check for --pin flag in arguments
+    pinPackage = false;
+    remainingArgs = {};
+    for i = 1:length(varargin)
+        if ischar(varargin{i}) && strcmp(varargin{i}, '--pin')
+            pinPackage = true;
+        else
+            remainingArgs{end+1} = varargin{i};
+        end
+    end
     
     % Parse optional arguments for internal use
     p = inputParser;
     addParameter(p, 'importingStack', {}, @iscell);
     addParameter(p, 'isDirect', true, @islogical);
-    parse(p, varargin{:});
+    parse(p, remainingArgs{:});
     importingStack = p.Results.importingStack;
     isDirect = p.Results.isDirect;
     
@@ -114,6 +126,11 @@ function import(packageName, varargin)
     
     % Mark package as imported
     markPackageAsImported(packageName, isDirect);
+    
+    % Pin package if requested
+    if pinPackage && isDirect
+        mip.pin(packageName);
+    end
 end
 
 function imported = isPackageImported(packageName)
