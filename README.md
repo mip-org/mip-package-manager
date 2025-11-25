@@ -58,24 +58,18 @@ mip install package_name
 
 Downloads and installs a package to `~/.mip/packages/package_name`.
 
-Currently, the supported packages are:
-- [export_fig](https://github.com/altmany/export_fig)
-- [chebfun](https://github.com/chebfun/chebfun)
-- [surfacefun](https://github.com/danfortunato/surfacefun) - depends on chebfun
-- [FLAM](https://github.com/klho/FLAM)
-- [kdtree](https://github.com/taiya/kdtree) - however, Linux MEX files are not yet provided
-- [fmm2d](https://github.com/flatironinstitute/fmm2d) - however, only Linux MEX files are currently provided
+[Table of installable packages](https://mip-org.github.io/mip-core/packages.html)
 
 ### Using packages in MATLAB
 
-After setting up the MATLAB path and installing packages, you can import them in MATLAB:
+After setting up the MATLAB path and installing packages, you can load them in MATLAB:
 
 ```matlab
-% Import a package (adds it to the path for the current session)
-mip.import('package_name')
+% Load a package (adds it to the path for the current session)
+mip.load('package_name')
 
 % or
-mip import package_name
+mip.load('package_name')
 
 % Now you can use the package functions
 ```
@@ -100,7 +94,7 @@ Removes an installed package after confirmation. Also removes any packages that 
 
 - Packages are stored in `~/.mip/packages/`
 - Each package is extracted from a zip (.mhl) file into its own directory
-- Each package has a `mip.json` file containing metadata and a `setup.m` that gets called on import
+- Each package has a `mip.json` file containing metadata, a `load.m` that gets called when the package is loaded, and an `unload.m` that gets called when the package is unloaded.
 - The `+mip` MATLAB namespace is installed in `~/.mip/matlab/+mip/`
 
 ## Example
@@ -114,7 +108,7 @@ mip list
 
 # Use in MATLAB
 matlab
->> mip import surfacefun
+>> mip load surfacefun
 >> % Now use the toolbox functions
 
 # Uninstall
