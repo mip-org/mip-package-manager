@@ -48,6 +48,8 @@ addpath('~/.mip/matlab')
 
 ## Usage
 
+For detailed documentation on all commands and features, see the [Usage Guide](docs/usage-guide.md).
+
 ### Install a package
 
 Either from the command line or from within MATLAB, run:
