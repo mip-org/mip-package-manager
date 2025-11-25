@@ -66,10 +66,7 @@ After setting up the MATLAB path and installing packages, you can load them in M
 
 ```matlab
 % Load a package (adds it to the path for the current session)
-mip.load('package_name')
-
-% or
-mip.load('package_name')
+mip load package_name
 
 % Now you can use the package functions
 ```

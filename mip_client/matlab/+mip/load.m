@@ -115,7 +115,7 @@ function load(packageName, varargin)
     originalDir = pwd;
     cd(packageDir);
     try
-        run(setupFile);
+        run(loadFile);
         fprintf('Loaded package "%s"\n', packageName);
     catch ME
         warning('mip:loadError', ...

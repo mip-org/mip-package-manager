@@ -75,7 +75,6 @@ function executeUnload(packageDir, packageName)
         warning('mip:unloadNotFound', ...
                 'Package "%s" does not have a unload.m file. Path changes may persist.', ...
                 packageName);
-                packageName);
         return;
     end
 
