@@ -6,7 +6,7 @@ function unload(packageName)
     %   mip.unload('--all')
     %
     % This function unloads the specified package by executing its
-    % unload.m file (if it exists) and then prunes any packages that
+    % unload_package.m file (if it exists) and then prunes any packages that
     % are no longer needed (packages that were loaded as dependencies
     % but are not dependencies of any directly loaded package).
     %
@@ -40,7 +40,7 @@ function unload(packageName)
     packagesDir = fullfile(mipRootDir, 'packages');
     packageDir = fullfile(packagesDir, packageName);
     
-    % Execute unload.m if it exists
+    % Execute unload_package.m if it exists
     executeUnload(packageDir, packageName);
     
     % Remove from pinned packages if it was pinned
@@ -68,24 +68,24 @@ function unload(packageName)
 end
 
 function executeUnload(packageDir, packageName)
-    % Execute unload.m for a package if it exists
-    unloadFile = fullfile(packageDir, 'unload.m');
+    % Execute unload_package.m for a package if it exists
+    unloadFile = fullfile(packageDir, 'unload_package.m');
     
     if ~exist(unloadFile, 'file')
         warning('mip:unloadNotFound', ...
-                'Package "%s" does not have a unload.m file. Path changes may persist.', ...
+                'Package "%s" does not have a unload_package.m file. Path changes may persist.', ...
                 packageName);
         return;
     end
 
-    % Execute the unload.m file
+    % Execute the unload_package.m file
     originalDir = pwd;
     cd(packageDir);
     try
         run(unloadFile);
     catch ME
         warning('mip:unloadError', ...
-                'Error executing unload.m for package "%s": %s', ...
+                'Error executing unload_package.m for package "%s": %s', ...
                 packageName, ME.message);
     end
     cd(originalDir);
@@ -134,7 +134,7 @@ function pruneUnusedPackages(packagesDir)
             pkg = packagesToPrune{i};
             packageDir = fullfile(packagesDir, pkg);
             
-            % Execute unload.m
+            % Execute unload_package.m
             executeUnload(packageDir, pkg);
             
             % Remove from loaded packages
@@ -226,7 +226,7 @@ function unloadAll()
         pkg = packagesToUnload{i};
         packageDir = fullfile(packagesDir, pkg);
 
-        % Execute unload.m
+        % Execute unload_package.m
         executeUnload(packageDir, pkg);
         fprintf('  Unloaded package "%s"\n', pkg);
     end

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [0.3.0] - 2025-11-26
+
+- Use load_package.m and unload_package.m instead of load.m and unload.m for package-specific load/unload functions
+
 ## [0.2.0] - 2025-11-24
 
 - Direct/indirect imports and listing imported packages

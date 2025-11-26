@@ -106,7 +106,7 @@ Removes an installed package after confirmation. Also removes any packages that 
 
 - Packages are stored in `~/.mip/packages/`
 - Each package is extracted from a zip (.mhl) file into its own directory
-- Each package has a `mip.json` file containing metadata, a `load.m` that gets called when the package is loaded, and an `unload.m` that gets called when the package is unloaded.
+- Each package has a `mip.json` file containing metadata, a `load_package.m` that gets called when the package is loaded, and an `unload_package.m` that gets called when the package is unloaded.
 - The `+mip` MATLAB namespace is installed in `~/.mip/matlab/+mip/`
 
 ## Example

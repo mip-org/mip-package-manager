@@ -6,7 +6,7 @@ function load(packageName, varargin)
     %   mip.load('packageName', '--pin')
     %
     % This function loads the specified package from ~/.mip/packages by
-    % executing its load.m file. Use '--pin' to automatically pin the package.
+    % executing its load_package.m file. Use '--pin' to automatically pin the package.
     
     % Check for --pin flag in arguments
     pinPackage = false;
@@ -37,7 +37,7 @@ function load(packageName, varargin)
     % Add to loading stack for circular dependency detection
     loadingStack = [loadingStack, {packageName}];
 
-    % Get the mip packages directory based on the location of this load.m file
+    % Get the mip packages directory based on the location of this load_package.m file
     % load.m is located at ~/.mip/matlab/+mip/load.m
     % We need to go up to ~/.mip/packages/
     loadFileDir = fileparts(mfilename('fullpath'));
@@ -104,14 +104,14 @@ function load(packageName, varargin)
         end
     end
     
-    % Look for load.m file
-    loadFile = fullfile(packageDir, 'load.m');
+    % Look for load_package.m file
+    loadFile = fullfile(packageDir, 'load_package.m');
     if ~exist(loadFile, 'file')
         error('mip:loadNotFound', ...
-              'Package "%s" does not have a load.m file', packageName);
+              'Package "%s" does not have a load_package.m file', packageName);
     end
 
-    % Execute the load.m file
+    % Execute the load_package.m file
     originalDir = pwd;
     cd(packageDir);
     try
@@ -119,7 +119,7 @@ function load(packageName, varargin)
         fprintf('Loaded package "%s"\n', packageName);
     catch ME
         warning('mip:loadError', ...
-                'Error executing load.m for package "%s": %s', ...
+                'Error executing load_package.m for package "%s": %s', ...
                 packageName, ME.message);
     end
     cd(originalDir);

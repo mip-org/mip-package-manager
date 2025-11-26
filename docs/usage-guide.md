@@ -116,7 +116,7 @@ mip load mypackage --pin
 ```
 
 **What happens:**
-- The package's `load.m` script is executed
+- The package's `load_package.m` script is executed
 - Package directories are added to the MATLAB path
 - Package functions become available
 
@@ -140,7 +140,7 @@ mip unload --all
 ```
 
 **What happens:**
-- The package's `unload.m` script is executed
+- The package's `unload_package.m` script is executed
 - Package directories are removed from the MATLAB path
 - Package functions are no longer available
 
@@ -267,7 +267,7 @@ mip install https://example.com/packages/mypackage.mhl
 - **Packages:** `~/.mip/packages/`
   - Each package is in its own subdirectory: `~/.mip/packages/<package_name>/`
   - Contains `mip.json` metadata file
-  - Contains `load.m` and `unload.m` scripts
+  - Contains `load_package.m` and `unload_package.m` scripts
   - Contains package files and directories
 
 ### MATLAB Integration
@@ -275,7 +275,7 @@ mip install https://example.com/packages/mypackage.mhl
 - **MATLAB files:** `~/.mip/matlab/`
   - Main interface: `~/.mip/matlab/mip.m`
   - Package namespace: `~/.mip/matlab/+mip/`
-  - Functions: `load.m`, `unload.m`, `pin.m`, `unpin.m`, `list_loaded.m`
+  - Functions: `load_package.m`, `unload_package.m`, `pin.m`, `unpin.m`, `list_loaded.m`
 
 **Important:** Add `~/.mip/matlab` to your MATLAB path for the interface to work.
 
