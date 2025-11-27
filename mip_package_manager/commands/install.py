@@ -101,10 +101,10 @@ def _install_from_mhl(mhl_source, mip_dir):
             sys.exit(1)
         
         # Get package name
-        package_name = mip_config.get('package')
+        package_name = mip_config.get('name')
         if not package_name:
             print(f"Error: Package name not found in mip.json")
-            print(f"The mip.json file must contain a 'package' field with the package name")
+            print(f"The mip.json file must contain a 'name' field with the package name")
             sys.exit(1)
         
         # Check if package is already installed
