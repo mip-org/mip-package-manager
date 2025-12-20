@@ -1,20 +1,20 @@
-# Platform Tags for .mhl Packages
+# Architecture tags for .mhl Packages
 
 ## Package Naming Convention
 
 MHL packages follow this naming format:
 
 ```
-{package}-{version}-{matlab_tag}-{abi_tag}-{platform_tag}.mhl
+{package}-{version}-{architecture}.mhl
 ```
 
 Example: `fmm2d-1.0.0-any-none-linux_x86_64.mhl`
 
-## Platform Tag Reference
+## Architecture Reference
 
-### Platform-Independent
+### Architecture-Independent
 
-- `any` - Either pure MATLAB code with no compiled components, OR includes compiled binaries for all supported platforms
+- `any` - Either pure MATLAB code with no compiled components, OR includes compiled binaries for all supported architectures
 
 ### Linux
 
@@ -36,7 +36,6 @@ Example: `fmm2d-1.0.0-any-none-linux_x86_64.mhl`
 
 ## Notes
 
-- The `matlab_tag` is typically `any` (not version-specific)
-- The `abi_tag` is typically `none` (no specific MATLAB ABI requirement)
-- Packages with compiled MEX files must specify the target platform, unless they contain binaries for all platforms
-- Pure MATLAB packages should use platform tag `any` for maximum compatibility
+- The `architecture` is typically `any` if no compiled binaries are included
+- Packages with compiled MEX files must specify the target architecture, unless they contain binaries for all architectures
+- Pure MATLAB packages should use architecture tag `any` for maximum compatibility

@@ -1,7 +1,7 @@
 """CLI entry point for mip"""
 
 import sys
-from .commands import install_package, uninstall_package, list_packages, setup_matlab, find_name_collisions, print_platform
+from .commands import install_package, uninstall_package, list_packages, setup_matlab, find_name_collisions, print_architecture
 
 def print_usage():
     """Print usage information"""
@@ -13,7 +13,7 @@ def print_usage():
     print("  list                       List installed packages")
     print("  setup                      Set up MATLAB integration")
     print("  find-name-collisions       Find symbol name collisions across packages")
-    print("  platform                   Print the current platform tag")
+    print("  architecture                Print the current architecture tag")
     print()
     print("Examples:")
     print("  mip install mypackage")
@@ -25,7 +25,7 @@ def print_usage():
     print("  mip list")
     print("  mip setup")
     print("  mip find-name-collisions")
-    print("  mip platform")
+    print("  mip architecture")
 
 def main():
     """Main entry point for the CLI"""
@@ -60,8 +60,8 @@ def main():
     elif command == 'find-name-collisions':
         find_name_collisions()
     
-    elif command == 'platform':
-        print_platform()
+    elif command == 'architecture':
+        print_architecture()
     
     else:
         print(f"Error: Unknown command '{command}'")

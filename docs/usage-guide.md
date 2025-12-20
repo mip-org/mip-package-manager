@@ -82,15 +82,15 @@ mip find-name-collisions
 
 This scans all installed packages and reports any function or class names that appear in multiple packages, which could cause conflicts when packages are loaded simultaneously.
 
-### `mip platform`
+### `mip architecture`
 
-Display the current platform tag for your system.
+Display the current architecture tag for your system.
 
 ```bash
-mip platform
+mip architecture
 ```
 
-This is useful for understanding which `.mhl` package files are compatible with your system. See [Platform Tags documentation](platform-tags.md) for details.
+This is useful for understanding which `.mhl` package files are compatible with your system. See [Architecture Tags documentation](architecture-tags.md) for details.
 
 ## MATLAB Interface
 

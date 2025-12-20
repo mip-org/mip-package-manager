@@ -10,7 +10,7 @@ from .uninstall import uninstall_package
 from .list_command import list_packages
 from .find_collisions import find_name_collisions
 from .matlab_integration import setup_matlab
-from .platform_utils import print_platform
+from .platform_utils import print_architecture
 
 # Export public API
 __all__ = [
@@ -19,5 +19,5 @@ __all__ = [
     'list_packages',
     'find_name_collisions',
     'setup_matlab',
-    'print_platform',
+    'print_architecture',
 ]

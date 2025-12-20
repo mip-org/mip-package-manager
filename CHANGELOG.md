@@ -19,7 +19,7 @@
 ## [0.1.4] - 2025-11-24
 
 - Split commands.py into multiple files
-- Support platform-specific package versions
+- Support architecture-specific package versions
 - Allow MIP_DIR environment variable to override default packages directory location
 
 ## [0.1.3] - 2025-11-22

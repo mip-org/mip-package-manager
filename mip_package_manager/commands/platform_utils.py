@@ -4,11 +4,11 @@ import platform
 import sys
 
 
-def get_current_platform_tag():
-    """Detect the current platform and return the corresponding MIP platform tag
-    
+def get_current_architecture_tag():
+    """Detect the current architecture and return the corresponding MIP architecture tag
+
     Returns:
-        str: Platform tag (e.g., 'linux_x86_64', 'macosx_11_0_arm64', 'win_amd64')
+        str: Architecture tag (e.g., 'linux_x86_64', 'macosx_11_0_arm64', 'win_amd64')
     """
     system = platform.system()
     machine = platform.machine().lower()
@@ -50,99 +50,98 @@ def get_current_platform_tag():
             return f'win_{machine}'
     
     else:
-        # Unknown platform - return a generic tag
+        # Unknown architecture - return a generic tag
         return f'{system.lower()}_{machine}'
 
 
-def is_platform_compatible(package_platform_tag, current_platform_tag=None):
-    """Check if a package's platform tag is compatible with the current platform
+def is_architecture_compatible(package_architecture, current_architecture=None):
+    """Check if a package's architecture tag is compatible with the current architecture
     
     Args:
-        package_platform_tag: The platform tag from the package metadata
-        current_platform_tag: The current platform tag (detected if not provided)
+        package_architecture: The architecture tag from the package metadata
+        current_architecture: The current architecture tag (detected if not provided)
     
     Returns:
         bool: True if compatible, False otherwise
     """
-    if current_platform_tag is None:
-        current_platform_tag = get_current_platform_tag()
-    
-    # Universal packages work on any platform
-    if package_platform_tag == 'any':
+    if current_architecture is None:
+        current_architecture = get_current_architecture_tag()
+
+    # Universal packages work on any architecture
+    if package_architecture == 'any':
         return True
     
     # Exact match
-    if package_platform_tag == current_platform_tag:
+    if package_architecture == current_architecture:
         return True
     
     # Special case: macOS universal2 binaries work on both Intel and Apple Silicon
-    if package_platform_tag == 'macosx_10_9_universal2':
-        if current_platform_tag in ('macosx_10_9_x86_64', 'macosx_11_0_arm64'):
+    if package_architecture == 'macosx_10_9_universal2':
+        if current_architecture in ('macosx_10_9_x86_64', 'macosx_11_0_arm64'):
             return True
     
     return False
 
 
-def select_best_package_variant(variants, current_platform_tag=None):
-    """Select the best package variant for the current platform
-    
-    When multiple variants of a package exist (e.g., platform-specific and 'any'),
-    prefer the platform-specific version.
-    
+def select_best_package_variant(variants, current_architecture=None):
+    """Select the best package variant for the current architecture
+
+    When multiple variants of a package exist (e.g., architecture-specific and 'any'),
+    prefer the architecture-specific version.
+
     Args:
-        variants: List of package info dictionaries with 'platform_tag' field
-        current_platform_tag: The current platform tag (detected if not provided)
-    
+        variants: List of package info dictionaries with 'architecture' field
+        current_architecture: The current architecture (detected if not provided)
+
     Returns:
         dict or None: The best matching package variant, or None if no compatible variant
     """
-    if current_platform_tag is None:
-        current_platform_tag = get_current_platform_tag()
+    if current_architecture is None:
+        current_architecture = get_current_architecture_tag()
     
     if not variants:
         return None
     
     # Filter to compatible variants only
-    compatible = [v for v in variants if is_platform_compatible(v['platform_tag'], current_platform_tag)]
-    
+    compatible = [v for v in variants if is_architecture_compatible(v['architecture'], current_architecture)]
+
     if not compatible:
         return None
-    
-    # Prefer exact platform matches over 'any'
-    exact_matches = [v for v in compatible if v['platform_tag'] == current_platform_tag]
+
+    # Prefer exact architecture matches over 'any'
+    exact_matches = [v for v in compatible if v['architecture'] == current_architecture]
     if exact_matches:
         # If multiple exact matches, prefer the one with highest version/build
         return exact_matches[0]
     
     # Check for universal2 on macOS
-    if current_platform_tag.startswith('macosx_'):
-        universal2 = [v for v in compatible if v['platform_tag'] == 'macosx_10_9_universal2']
+    if current_architecture.startswith('macosx_'):
+        universal2 = [v for v in compatible if v['architecture'] == 'macosx_10_9_universal2']
         if universal2:
             return universal2[0]
-    
-    # Fall back to 'any' platform
-    any_platform = [v for v in compatible if v['platform_tag'] == 'any']
-    if any_platform:
-        return any_platform[0]
-    
-    # Should not reach here if is_platform_compatible is working correctly
+
+    # Fall back to 'any' architecture
+    any_architecture = [v for v in compatible if v['architecture'] == 'any']
+    if any_architecture:
+        return any_architecture[0]
+
+    # Should not reach here if is_architecture_compatible is working correctly
     return compatible[0] if compatible else None
 
 
-def get_available_platforms_for_package(variants):
-    """Get a list of available platforms for a package
-    
-    Args:
-        variants: List of package info dictionaries with 'platform_tag' field
-    
-    Returns:
-        list: Sorted list of unique platform tags
-    """
-    platforms = set(v['platform_tag'] for v in variants)
-    return sorted(platforms)
+def get_available_architectures_for_package(variants):
+    """Get a list of available architectures for a package
 
-def print_platform():
-    """Print the current platform tag"""
-    platform_tag = get_current_platform_tag()
-    print(f"{platform_tag}")
-    return platform_tag
+    Args:
+        variants: List of package info dictionaries with 'architecture' field
+
+    Returns:
+        list: Sorted list of unique architecture tags
+    """
+    architectures = set(v['architecture'] for v in variants)
+    return sorted(architectures)
+
+def print_architecture():
+    """Print the current architecture tag"""
+    architecture_tag = get_current_architecture_tag()
+    print(f"{architecture_tag}")
