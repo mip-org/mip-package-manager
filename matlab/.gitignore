@@ -1,0 +1,50 @@
+# MATLAB specific files
+*.asv
+*.m~
+*.autosave
+slprj/
+*.slxc
+
+# Temporary files
+octave-workspace
+*.fig
+
+# MEX files
+*.mex*
+*.mexw32
+*.mexw64
+*.mexa64
+*.mexmaci64
+*.mexglx
+
+# Code generation files
+codegen/
+*.prj
+
+# P-code files
+*.p
+
+# Simulink
+*.slx.autosave
+*.slxp
+*.slxc
+*.slx.original
+
+# Documentation build files
+html/
+latex/
+
+# OS specific
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+# IDE specific
+.vscode/
+.idea/
+
+# Test output
+*.log
+test_results/
