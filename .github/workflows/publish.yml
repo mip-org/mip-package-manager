@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'pyproject.toml'
+      - 'python/pyproject.toml'
   workflow_dispatch:
 
 jobs:
@@ -29,11 +29,17 @@ jobs:
         pip install build
     
     - name: Build package
-      run: python -m build
+      run: |
+        cd python
+        python -m build
+        # move the built distributions to the root for the pypi publish action
+        mv dist/* ../dist/
+        cd ..
     
     - name: Extract version from pyproject.toml
       id: get_version
       run: |
+        cd python
         VERSION=$(grep -Po '(?<=^version = ")[^"]*' pyproject.toml)
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Extracted version: $VERSION"
