@@ -52,7 +52,7 @@ mip list
 mip list-loaded
 
 % Get detailed package information
-mip package-info chebfun
+mip info chebfun
 ```
 
 ### Uninstalling Packages
@@ -120,7 +120,7 @@ matlab/
 │   ├── list.m                 # List command
 │   ├── architecture.m         # Architecture command
 │   ├── find_name_collisions.m # Collision detection
-│   ├── package_info.m         # Package info command
+│   ├── info.m                 # Package info command
 │   ├── load.m                 # Load package
 │   ├── unload.m               # Unload package
 │   ├── pin.m                  # Pin package
@@ -254,7 +254,7 @@ mip install mypackage
 %   - mypackage 1.5.0
 
 % Get package info to see dependencies
-mip package-info mypackage
+mip info mypackage
 ```
 
 ### Finding Collisions

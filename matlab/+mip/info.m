@@ -1,8 +1,8 @@
-function package_info(packageName)
-    % PACKAGE_INFO Display detailed information about a package
+function info(packageName)
+    % INFO Display detailed information about a package
     %
     % Usage:
-    %   mip.package_info('packageName')
+    %   mip.info('packageName')
     %
     % Args:
     %   packageName - Name of the package to display information for
@@ -11,7 +11,7 @@ function package_info(packageName)
     % name, version, dependencies, exposed symbols, and installation path.
     %
     % Example:
-    %   mip.package_info('chebfun')
+    %   mip.info('chebfun')
     
     if nargin < 1
         error('mip:noPackage', 'Package name is required');
