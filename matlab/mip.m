@@ -13,7 +13,7 @@ function varargout = mip(command, varargin)
     %   mip list-loaded                 - List currently loaded packages
     %   mip find-name-collisions        - Find symbol name collisions
     %   mip architecture                - Display current architecture tag
-    %   mip package-info <package>      - Display package information
+    %   mip info <package>              - Display package information
     %
     % Examples:
     %   mip install chebfun
@@ -25,7 +25,7 @@ function varargout = mip(command, varargin)
     %   mip unload --all
     %   mip find-name-collisions
     %   mip architecture
-    %   mip package-info chebfun
+    %   mip info chebfun
     
     if nargin < 1
         error('mip:noCommand', 'No command specified. Use "help mip" for usage information.');
@@ -92,12 +92,12 @@ function varargout = mip(command, varargin)
         case 'architecture'
             mip.architecture();
             
-        case 'package-info'
+        case 'info'
             if nargin < 2
-                error('mip:noPackage', 'No package specified for package-info command.');
+                error('mip:noPackage', 'No package specified for info command.');
             end
             packageName = varargin{1};
-            mip.package_info(packageName);
+            mip.info(packageName);
             
         case 'help'
             help mip;
