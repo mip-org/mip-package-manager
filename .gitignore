@@ -3,3 +3,15 @@
 
 # MATLAB
 *.asv
+
+# Python
+__pycache__/
+*.py[codz]
+build/
+dist/
+*.egg-info/
+*.spec
+*.dist
+
+# Visual Studio Code
+.vscode/
