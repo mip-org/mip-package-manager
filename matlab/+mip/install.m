@@ -1,34 +1,25 @@
-function install(packageNames)
-    % INSTALL Install one or more mip packages
-    %
-    % Usage:
-    %   mip.install('packageName')
-    %   mip.install({'package1', 'package2', 'package3'})
-    %   mip.install('/path/to/package.mhl')
-    %   mip.install('https://example.com/package.mhl')
-    %
-    % Args:
-    %   packageNames - Package name(s), .mhl file path(s), or URL(s)
-    %                  Can be a string, char array, or cell array
-    %
-    % This function installs packages from the mip repository, local .mhl files,
-    % or URLs. Dependencies are automatically resolved and installed.
-    %
-    % Examples:
-    %   mip.install('chebfun')
-    %   mip.install({'package1', 'package2'})
-    %   mip.install('/home/user/mypackage.mhl')
-    
-    % Normalize input to cell array
-    if ischar(packageNames) || isstring(packageNames)
-        packageNames = {char(packageNames)};
-    elseif ~iscell(packageNames)
-        error('mip:invalidInput', ...
-              'packageNames must be a string, char array, or cell array');
+function install(varargin)
+%INSTALL   Install one or more mip packages.
+%
+% Usage:
+%   mip.install('packageName')
+%   mip.install('package1', 'package2', 'package3')
+%   mip.install('/path/to/package.mhl')
+%   mip.install('https://example.com/package.mhl')
+%
+% Args:
+%   Package name(s), .mhl file path(s), or URL(s), as strings or char arrays.
+%
+% This function installs packages from the mip repository, local .mhl files,
+% or URLs. Dependencies are automatically resolved and installed.
+
+    if nargin < 1
+        error('mip:install:noPackage', 'At least one package name is required for install command.');
     end
-    
+
+    packageNames = varargin;
     packagesDir = mip.utils.get_packages_dir();
-    
+
     % Create packages directory if it doesn't exist
     if ~exist(packagesDir, 'dir')
         mkdir(packagesDir);

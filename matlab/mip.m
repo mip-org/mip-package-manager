@@ -41,7 +41,7 @@ function varargout = mip(command, varargin)
             if nargin < 2
                 error('mip:noPackage', 'At least one package name required for install command.');
             end
-            mip.install(varargin);
+            mip.install(varargin{:});
             
         case 'uninstall'
             if nargin < 2
