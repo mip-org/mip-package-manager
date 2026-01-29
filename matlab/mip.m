@@ -14,6 +14,7 @@ function varargout = mip(command, varargin)
     %   mip find-name-collisions        - Find symbol name collisions
     %   mip arch                        - Display current architecture tag
     %   mip info <package>              - Display package information
+    %   mip help [command]              - Show help text for command
     %
     % Examples:
     %   mip install chebfun
@@ -28,7 +29,7 @@ function varargout = mip(command, varargin)
     %   mip info chebfun
     
     if nargin < 1
-        error('mip:noCommand', 'No command specified. Use "help mip" for usage information.');
+        command = 'help';
     end
     
     % Normalize command to lowercase
@@ -100,7 +101,16 @@ function varargout = mip(command, varargin)
             mip.info(packageName);
             
         case 'help'
-            help mip;
+            if nargin > 1
+                % Show help text for command
+                command = ['+mip/' varargin{1} '.m'];
+                if ~exist(command, 'file')
+                    error('mip:unknownCommand', ['Unknown mip command ''' varargin{1} '''.']);
+                end
+                help(command);
+            else
+                help mip;
+            end
             
         otherwise
             error('mip:unknownCommand', ...
