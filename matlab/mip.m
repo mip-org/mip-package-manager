@@ -12,7 +12,7 @@ function varargout = mip(command, varargin)
     %   mip unpin <package>             - Unpin a package
     %   mip list-loaded                 - List currently loaded packages
     %   mip find-name-collisions        - Find symbol name collisions
-    %   mip architecture                - Display current architecture tag
+    %   mip arch                        - Display current architecture tag
     %   mip info <package>              - Display package information
     %
     % Examples:
@@ -24,7 +24,7 @@ function varargout = mip(command, varargin)
     %   mip load mypackage --pin
     %   mip unload --all
     %   mip find-name-collisions
-    %   mip architecture
+    %   mip arch
     %   mip info chebfun
     
     if nargin < 1
@@ -89,8 +89,8 @@ function varargout = mip(command, varargin)
         case 'find-name-collisions'
             mip.find_name_collisions();
             
-        case 'architecture'
-            mip.architecture();
+        case {'architecture', 'arch'}
+            mip.arch();
             
         case 'info'
             if nargin < 2

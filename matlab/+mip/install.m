@@ -87,7 +87,7 @@ function count = installFromRepository(repoPackages, packagesDir)
         index = jsondecode(indexJson);
         
         % Get current architecture
-        currentArch = mip.utils.get_architecture();
+        currentArch = mip.arch();
         fprintf('Detected architecture: %s\n', currentArch);
         
         % Group packages by name
