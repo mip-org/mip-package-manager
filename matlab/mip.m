@@ -99,7 +99,10 @@ function varargout = mip(command, varargin)
             end
             packageName = varargin{1};
             mip.info(packageName);
-            
+
+        case 'root'
+            mip.root();
+
         case 'help'
             if nargin > 1
                 % Show help text for command
