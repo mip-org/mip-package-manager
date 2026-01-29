@@ -35,9 +35,7 @@ function unload(packageName)
     end
     
     % Get the mip packages directory
-    loadFileDir = fileparts(mfilename('fullpath'));
-    mipRootDir = fileparts(fileparts(loadFileDir));
-    packagesDir = fullfile(mipRootDir, 'packages');
+    packagesDir = mip.utils.get_packages_dir();
     packageDir = fullfile(packagesDir, packageName);
     
     % Execute unload_package.m if it exists
@@ -199,9 +197,7 @@ function unloadAll()
     end
     
     % Get the mip packages directory
-    loadFileDir = fileparts(mfilename('fullpath'));
-    mipRootDir = fileparts(fileparts(loadFileDir));
-    packagesDir = fullfile(mipRootDir, 'packages');
+    packagesDir = mip.utils.get_packages_dir();
     
     % Find packages to unload (all except pinned)
     packagesToUnload = {};

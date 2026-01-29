@@ -15,7 +15,7 @@ function load(packageName, varargin)
         if ischar(varargin{i}) && strcmp(varargin{i}, '--pin')
             pinPackage = true;
         else
-            remainingArgs{end+1} = varargin{i};
+            remainingArgs{end+1} = varargin{i}; %#ok<*AGROW>
         end
     end
     
@@ -37,21 +37,8 @@ function load(packageName, varargin)
     % Add to loading stack for circular dependency detection
     loadingStack = [loadingStack, {packageName}];
 
-    % Get the mip packages directory based on the location of this load_package.m file
-    % load.m is located at ~/.mip/matlab/+mip/load.m
-    % We need to go up to ~/.mip/packages/
-    loadFileDir = fileparts(mfilename('fullpath'));
-    mipRootDir = fileparts(fileparts(loadFileDir));
-    packagesDir = fullfile(mipRootDir, 'packages');
-    
-    % Check if packages directory exists
-    if ~exist(packagesDir, 'dir')
-        error('mip:packagesDirectoryNotFound', ...
-              ['The mip packages directory does not exist: %s\n' ...
-               'Please run "mip setup" from the command line to set up mip.'], ...
-              packagesDir);
-    end
-    
+    % Get the mip packages directory
+    packagesDir = mip.utils.get_packages_dir();
     packageDir = fullfile(packagesDir, packageName);
     
     % Check if package exists
