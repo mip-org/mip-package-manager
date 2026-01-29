@@ -135,23 +135,16 @@ end
 
 function loaded = isPackageLoaded(packageName)
     % Helper function to check if a package has already been loaded
-    global MIP_LOADED_PACKAGES;
-    if isempty(MIP_LOADED_PACKAGES)
-        MIP_LOADED_PACKAGES = {};
-    end
+    MIP_LOADED_PACKAGES = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
     loaded = ismember(packageName, MIP_LOADED_PACKAGES);
 end
 
 function markPackageAsLoaded(packageName, isDirect)
     % Helper function to mark a package as loaded
-    global MIP_LOADED_PACKAGES;
-    global MIP_DIRECTLY_LOADED_PACKAGES;
-
-    if isempty(MIP_LOADED_PACKAGES)
-        MIP_LOADED_PACKAGES = {};
-    end
+    MIP_LOADED_PACKAGES = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
     if ~ismember(packageName, MIP_LOADED_PACKAGES)
         MIP_LOADED_PACKAGES{end+1} = packageName;
+        mip.utils.set_key_value('MIP_LOADED_PACKAGES', MIP_LOADED_PACKAGES);
     end
 
     % Track directly loaded packages separately
@@ -162,21 +155,15 @@ end
 
 function markPackageAsDirect(packageName)
     % Helper function to mark a package as directly loaded
-    global MIP_DIRECTLY_LOADED_PACKAGES;
-
-    if isempty(MIP_DIRECTLY_LOADED_PACKAGES)
-        MIP_DIRECTLY_LOADED_PACKAGES = {};
-    end
+    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.get_key_value('MIP_DIRECTLY_LOADED_PACKAGES');
     if ~ismember(packageName, MIP_DIRECTLY_LOADED_PACKAGES)
         MIP_DIRECTLY_LOADED_PACKAGES{end+1} = packageName;
+        mip.utils.set_key_value('MIP_DIRECTLY_LOADED_PACKAGES', MIP_DIRECTLY_LOADED_PACKAGES);
     end
 end
 
 function direct = isPackageDirectlyLoaded(packageName)
     % Helper function to check if a package is directly loaded
-    global MIP_DIRECTLY_LOADED_PACKAGES;
-    if isempty(MIP_DIRECTLY_LOADED_PACKAGES)
-        MIP_DIRECTLY_LOADED_PACKAGES = {};
-    end
+    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.get_key_value('MIP_DIRECTLY_LOADED_PACKAGES');
     direct = ismember(packageName, MIP_DIRECTLY_LOADED_PACKAGES);
 end

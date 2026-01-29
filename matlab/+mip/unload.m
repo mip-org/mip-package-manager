@@ -12,9 +12,9 @@ function unload(packageName)
     %
     % Use '--all' to unload all non-pinned packages.
 
-    global MIP_LOADED_PACKAGES;
-    global MIP_DIRECTLY_LOADED_PACKAGES;
-    global MIP_PINNED_PACKAGES;
+    MIP_LOADED_PACKAGES          = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
+    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.get_key_value('MIP_DIRECTLY_LOADED_PACKAGES');
+    MIP_PINNED_PACKAGES          = mip.utils.get_key_value('MIP_PINNED_PACKAGES');
     
     % Handle --all flag
     if strcmp(packageName, '--all')
@@ -45,20 +45,26 @@ function unload(packageName)
     
     % Remove from pinned packages if it was pinned
     if ~isempty(MIP_PINNED_PACKAGES)
-        MIP_PINNED_PACKAGES = MIP_PINNED_PACKAGES(...
-            ~strcmp(MIP_PINNED_PACKAGES, packageName));
+        MIP_PINNED_PACKAGES = MIP_PINNED_PACKAGES(    ...
+            ~strcmp(MIP_PINNED_PACKAGES, packageName) ...
+        );
+        mip.utils.set_key_value('MIP_PINNED_PACKAGES', MIP_PINNED_PACKAGES);
     end
     
     % Remove from directly loaded packages
     if ~isempty(MIP_DIRECTLY_LOADED_PACKAGES)
-        MIP_DIRECTLY_LOADED_PACKAGES = MIP_DIRECTLY_LOADED_PACKAGES(...
-            ~strcmp(MIP_DIRECTLY_LOADED_PACKAGES, packageName));
+        MIP_DIRECTLY_LOADED_PACKAGES = MIP_DIRECTLY_LOADED_PACKAGES( ...
+            ~strcmp(MIP_DIRECTLY_LOADED_PACKAGES, packageName)       ...
+        );
+        mip.utils.set_key_value('MIP_DIRECTLY_LOADED_PACKAGES', MIP_DIRECTLY_LOADED_PACKAGES);
     end
 
     % Remove from loaded packages
     if ~isempty(MIP_LOADED_PACKAGES)
-        MIP_LOADED_PACKAGES = MIP_LOADED_PACKAGES(...
-            ~strcmp(MIP_LOADED_PACKAGES, packageName));
+        MIP_LOADED_PACKAGES = MIP_LOADED_PACKAGES(    ...
+            ~strcmp(MIP_LOADED_PACKAGES, packageName) ...
+        );
+        mip.utils.set_key_value('MIP_LOADED_PACKAGES', MIP_LOADED_PACKAGES);
     end
 
     fprintf('Unloaded package "%s"\n', packageName);
@@ -97,22 +103,18 @@ function pruneUnusedPackages(packagesDir)
     % 1. Directly loaded by the user, OR
     % 2. A dependency of a directly loaded package
 
-    global MIP_LOADED_PACKAGES;
-    global MIP_DIRECTLY_LOADED_PACKAGES;
+    MIP_LOADED_PACKAGES          = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
+    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.get_key_value('MIP_DIRECTLY_LOADED_PACKAGES');
 
     if isempty(MIP_LOADED_PACKAGES)
-        return;
-    end
-
-    if isempty(MIP_DIRECTLY_LOADED_PACKAGES)
-        MIP_DIRECTLY_LOADED_PACKAGES = {};
+        return
     end
 
     % Build set of all needed packages (directly loaded + their dependencies)
     neededPackages = {};
     for i = 1:length(MIP_DIRECTLY_LOADED_PACKAGES)
         directPkg = MIP_DIRECTLY_LOADED_PACKAGES{i};
-        neededPackages = [neededPackages, getAllDependencies(directPkg, packagesDir)];
+        neededPackages = [neededPackages, getAllDependencies(directPkg, packagesDir)]; %#ok<*AGROW>
     end
 
     % Add directly loaded packages themselves
@@ -138,11 +140,13 @@ function pruneUnusedPackages(packagesDir)
             executeUnload(packageDir, pkg);
             
             % Remove from loaded packages
-            MIP_LOADED_PACKAGES = MIP_LOADED_PACKAGES(...
-                ~strcmp(MIP_LOADED_PACKAGES, pkg));
-            
+            MIP_LOADED_PACKAGES = MIP_LOADED_PACKAGES( ...
+                ~strcmp(MIP_LOADED_PACKAGES, pkg)      ...
+            );
+
             fprintf('  Pruned package "%s"\n', pkg);
         end
+        mip.utils.set_key_value('MIP_LOADED_PACKAGES', MIP_LOADED_PACKAGES);
     end
 end
 
@@ -185,16 +189,13 @@ end
 
 function unloadAll()
     % Unload all non-pinned packages
-    global MIP_LOADED_PACKAGES;
-    global MIP_PINNED_PACKAGES;
+    MIP_LOADED_PACKAGES          = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
+    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.get_key_value('MIP_DIRECTLY_LOADED_PACKAGES');
+    MIP_PINNED_PACKAGES          = mip.utils.get_key_value('MIP_PINNED_PACKAGES');
 
     if isempty(MIP_LOADED_PACKAGES)
         fprintf('No packages are currently loaded\n');
-        return;
-    end
-    
-    if isempty(MIP_PINNED_PACKAGES)
-        MIP_PINNED_PACKAGES = {};
+        return
     end
     
     % Get the mip packages directory
@@ -230,19 +231,19 @@ function unloadAll()
         executeUnload(packageDir, pkg);
         fprintf('  Unloaded package "%s"\n', pkg);
     end
-    
-    % Update global variables - remove all non-pinned packages
-    global MIP_DIRECTLY_LOADED_PACKAGES;
 
     % Keep only pinned packages in loaded list
     MIP_LOADED_PACKAGES = MIP_PINNED_PACKAGES;
+    mip.utils.set_key_value('MIP_LOADED_PACKAGES', MIP_LOADED_PACKAGES);
 
     % Keep only pinned packages in directly loaded list
     if ~isempty(MIP_DIRECTLY_LOADED_PACKAGES)
-        MIP_DIRECTLY_LOADED_PACKAGES = MIP_DIRECTLY_LOADED_PACKAGES(...
-            ismember(MIP_DIRECTLY_LOADED_PACKAGES, MIP_PINNED_PACKAGES));
+        MIP_DIRECTLY_LOADED_PACKAGES = MIP_DIRECTLY_LOADED_PACKAGES(    ...
+            ismember(MIP_DIRECTLY_LOADED_PACKAGES, MIP_PINNED_PACKAGES) ...
+        );
+        mip.utils.set_key_value('MIP_DIRECTLY_LOADED_PACKAGES', MIP_DIRECTLY_LOADED_PACKAGES);
     end
-    
+
     if ~isempty(MIP_PINNED_PACKAGES)
         fprintf('\nPinned packages remain loaded: %s\n', strjoin(MIP_PINNED_PACKAGES, ', '));
     end
@@ -250,18 +251,12 @@ end
 
 function loaded = isPackageLoaded(packageName)
     % Helper function to check if a package has already been loaded
-    global MIP_LOADED_PACKAGES;
-    if isempty(MIP_LOADED_PACKAGES)
-        MIP_LOADED_PACKAGES = {};
-    end
+    MIP_LOADED_PACKAGES = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
     loaded = ismember(packageName, MIP_LOADED_PACKAGES);
 end
 
 function pinned = isPackagePinned(packageName)
     % Helper function to check if a package is pinned
-    global MIP_PINNED_PACKAGES;
-    if isempty(MIP_PINNED_PACKAGES)
-        MIP_PINNED_PACKAGES = {};
-    end
+    MIP_PINNED_PACKAGES = mip.utils.get_key_value('MIP_PINNED_PACKAGES');
     pinned = ismember(packageName, MIP_PINNED_PACKAGES);
 end
