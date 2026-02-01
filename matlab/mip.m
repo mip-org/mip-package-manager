@@ -1,5 +1,5 @@
 function varargout = mip(command, varargin)
-%MIP   A package manager for MATLAB.
+%MIP   A package manager for MATLAB/MEX.
 %
 % Usage:
 %   mip install <package> [...]     - Install one or more packages
