@@ -1,72 +1,54 @@
 function unload(packageName)
-    % unload - Unload a mip package from MATLAB path
-    %
-    % Usage:
-    %   mip.unload('packageName')
-    %   mip.unload('--all')
-    %
-    % This function unloads the specified package by executing its
-    % unload_package.m file (if it exists) and then prunes any packages that
-    % are no longer needed (packages that were loaded as dependencies
-    % but are not dependencies of any directly loaded package).
-    %
-    % Use '--all' to unload all non-pinned packages.
+%UNLOAD   Unload a mip package from MATLAB path.
+%
+% Usage:
+%   mip.unload('packageName')
+%   mip.unload('--all')
+%
+% This function unloads the specified package by executing its
+% unload_package.m file (if it exists) and then prunes any packages that
+% are no longer needed (packages that were loaded as dependencies
+% but are not dependencies of any directly loaded package).
+%
+% Use '--all' to unload all non-pinned packages.
 
-    MIP_LOADED_PACKAGES          = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
-    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.get_key_value('MIP_DIRECTLY_LOADED_PACKAGES');
-    MIP_PINNED_PACKAGES          = mip.utils.get_key_value('MIP_PINNED_PACKAGES');
-    
     % Handle --all flag
     if strcmp(packageName, '--all')
         unloadAll();
-        return;
+        return
     end
 
     % Check if package is loaded
-    if ~isPackageLoaded(packageName)
+    if ~mip.utils.is_loaded(packageName)
         fprintf('Package "%s" is not currently loaded\n', packageName);
-        return;
+        return
     end
-    
+
     % Warn if package is pinned
-    if isPackagePinned(packageName)
+    if mip.utils.is_pinned(packageName)
         warning('mip:pinnedPackage', ...
-                'Package "%s" is pinned. It will be unloaded anyway.', packageName);
+                'Package "%s" is pinned. It will be unloaded anyway.', ...
+                packageName);
     end
-    
+
     % Get the mip packages directory
     packagesDir = mip.utils.get_packages_dir();
     packageDir = fullfile(packagesDir, packageName);
-    
+
     % Execute unload_package.m if it exists
     executeUnload(packageDir, packageName);
-    
-    % Remove from pinned packages if it was pinned
-    if ~isempty(MIP_PINNED_PACKAGES)
-        MIP_PINNED_PACKAGES = MIP_PINNED_PACKAGES(    ...
-            ~strcmp(MIP_PINNED_PACKAGES, packageName) ...
-        );
-        mip.utils.set_key_value('MIP_PINNED_PACKAGES', MIP_PINNED_PACKAGES);
-    end
-    
+
+    % Remove from pinned packages
+    mip.utils.key_value_remove('MIP_PINNED_PACKAGES', packageName);
+
     % Remove from directly loaded packages
-    if ~isempty(MIP_DIRECTLY_LOADED_PACKAGES)
-        MIP_DIRECTLY_LOADED_PACKAGES = MIP_DIRECTLY_LOADED_PACKAGES( ...
-            ~strcmp(MIP_DIRECTLY_LOADED_PACKAGES, packageName)       ...
-        );
-        mip.utils.set_key_value('MIP_DIRECTLY_LOADED_PACKAGES', MIP_DIRECTLY_LOADED_PACKAGES);
-    end
+    mip.utils.key_value_remove('MIP_DIRECTLY_LOADED_PACKAGES', packageName);
 
     % Remove from loaded packages
-    if ~isempty(MIP_LOADED_PACKAGES)
-        MIP_LOADED_PACKAGES = MIP_LOADED_PACKAGES(    ...
-            ~strcmp(MIP_LOADED_PACKAGES, packageName) ...
-        );
-        mip.utils.set_key_value('MIP_LOADED_PACKAGES', MIP_LOADED_PACKAGES);
-    end
+    mip.utils.key_value_remove('MIP_LOADED_PACKAGES', packageName);
 
     fprintf('Unloaded package "%s"\n', packageName);
-    
+
     % Prune packages that are no longer needed
     pruneUnusedPackages(packagesDir);
 end
@@ -74,12 +56,12 @@ end
 function executeUnload(packageDir, packageName)
     % Execute unload_package.m for a package if it exists
     unloadFile = fullfile(packageDir, 'unload_package.m');
-    
+
     if ~exist(unloadFile, 'file')
         warning('mip:unloadNotFound', ...
                 'Package "%s" does not have a unload_package.m file. Path changes may persist.', ...
                 packageName);
-        return;
+        return
     end
 
     % Execute the unload_package.m file
@@ -96,13 +78,13 @@ function executeUnload(packageDir, packageName)
 end
 
 function pruneUnusedPackages(packagesDir)
-    % Prune packages that are no longer needed
-    % A package is needed if it is:
-    % 1. Directly loaded by the user, OR
-    % 2. A dependency of a directly loaded package
+% Prune packages that are no longer needed
+% A package is needed if it is:
+% 1. Directly loaded by the user, OR
+% 2. A dependency of a directly loaded package
 
-    MIP_LOADED_PACKAGES          = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
-    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.get_key_value('MIP_DIRECTLY_LOADED_PACKAGES');
+    MIP_LOADED_PACKAGES          = mip.utils.key_value_get('MIP_LOADED_PACKAGES');
+    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.key_value_get('MIP_DIRECTLY_LOADED_PACKAGES');
 
     if isempty(MIP_LOADED_PACKAGES)
         return
@@ -126,46 +108,42 @@ function pruneUnusedPackages(packagesDir)
             packagesToPrune{end+1} = pkg;
         end
     end
-    
+
     % Prune each unnecessary package
     if ~isempty(packagesToPrune)
         fprintf('Pruning unnecessary packages: %s\n', strjoin(packagesToPrune, ', '));
         for i = 1:length(packagesToPrune)
             pkg = packagesToPrune{i};
             packageDir = fullfile(packagesDir, pkg);
-            
+
             % Execute unload_package.m
             executeUnload(packageDir, pkg);
-            
-            % Remove from loaded packages
-            MIP_LOADED_PACKAGES = MIP_LOADED_PACKAGES( ...
-                ~strcmp(MIP_LOADED_PACKAGES, pkg)      ...
-            );
 
+            % Remove from loaded packages
+            mip.utils.key_value_remove('MIP_LOADED_PACKAGES', pkg);
             fprintf('  Pruned package "%s"\n', pkg);
         end
-        mip.utils.set_key_value('MIP_LOADED_PACKAGES', MIP_LOADED_PACKAGES);
     end
 end
 
 function deps = getAllDependencies(packageName, packagesDir)
     % Recursively get all dependencies of a package
     deps = {};
-    
+
     packageDir = fullfile(packagesDir, packageName);
     mipJsonPath = fullfile(packageDir, 'mip.json');
-    
+
     if ~exist(mipJsonPath, 'file')
-        return;
+        return
     end
-    
+
     try
         % Read and parse mip.json
         fid = fopen(mipJsonPath, 'r');
         jsonText = fread(fid, '*char')';
         fclose(fid);
         mipConfig = jsondecode(jsonText);
-        
+
         % Get direct dependencies
         if isfield(mipConfig, 'dependencies') && ~isempty(mipConfig.dependencies)
             for i = 1:length(mipConfig.dependencies)
@@ -186,19 +164,20 @@ function deps = getAllDependencies(packageName, packagesDir)
 end
 
 function unloadAll()
-    % Unload all non-pinned packages
-    MIP_LOADED_PACKAGES          = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
-    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.get_key_value('MIP_DIRECTLY_LOADED_PACKAGES');
-    MIP_PINNED_PACKAGES          = mip.utils.get_key_value('MIP_PINNED_PACKAGES');
+% Unload all non-pinned packages
+
+    MIP_LOADED_PACKAGES          = mip.utils.key_value_get('MIP_LOADED_PACKAGES');
+    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.key_value_get('MIP_DIRECTLY_LOADED_PACKAGES');
+    MIP_PINNED_PACKAGES          = mip.utils.key_value_get('MIP_PINNED_PACKAGES');
 
     if isempty(MIP_LOADED_PACKAGES)
         fprintf('No packages are currently loaded\n');
         return
     end
-    
+
     % Get the mip packages directory
     packagesDir = mip.utils.get_packages_dir();
-    
+
     % Find packages to unload (all except pinned)
     packagesToUnload = {};
     for i = 1:length(MIP_LOADED_PACKAGES)
@@ -213,7 +192,7 @@ function unloadAll()
         if ~isempty(MIP_PINNED_PACKAGES)
             fprintf('Pinned packages remain: %s\n', strjoin(MIP_PINNED_PACKAGES, ', '));
         end
-        return;
+        return
     end
 
     fprintf('Unloading all non-pinned packages: %s\n', strjoin(packagesToUnload, ', '));
@@ -230,29 +209,15 @@ function unloadAll()
 
     % Keep only pinned packages in loaded list
     MIP_LOADED_PACKAGES = MIP_PINNED_PACKAGES;
-    mip.utils.set_key_value('MIP_LOADED_PACKAGES', MIP_LOADED_PACKAGES);
+    mip.utils.key_value_set('MIP_LOADED_PACKAGES', MIP_LOADED_PACKAGES);
 
     % Keep only pinned packages in directly loaded list
-    if ~isempty(MIP_DIRECTLY_LOADED_PACKAGES)
-        MIP_DIRECTLY_LOADED_PACKAGES = MIP_DIRECTLY_LOADED_PACKAGES(    ...
-            ismember(MIP_DIRECTLY_LOADED_PACKAGES, MIP_PINNED_PACKAGES) ...
-        );
-        mip.utils.set_key_value('MIP_DIRECTLY_LOADED_PACKAGES', MIP_DIRECTLY_LOADED_PACKAGES);
-    end
+    MIP_DIRECTLY_LOADED_PACKAGES = MIP_DIRECTLY_LOADED_PACKAGES(    ...
+        ismember(MIP_DIRECTLY_LOADED_PACKAGES, MIP_PINNED_PACKAGES) ...
+    );
+    mip.utils.key_value_set('MIP_DIRECTLY_LOADED_PACKAGES', MIP_DIRECTLY_LOADED_PACKAGES);
 
     if ~isempty(MIP_PINNED_PACKAGES)
         fprintf('\nPinned packages remain loaded: %s\n', strjoin(MIP_PINNED_PACKAGES, ', '));
     end
-end
-
-function loaded = isPackageLoaded(packageName)
-    % Helper function to check if a package has already been loaded
-    MIP_LOADED_PACKAGES = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
-    loaded = ismember(packageName, MIP_LOADED_PACKAGES);
-end
-
-function pinned = isPackagePinned(packageName)
-    % Helper function to check if a package is pinned
-    MIP_PINNED_PACKAGES = mip.utils.get_key_value('MIP_PINNED_PACKAGES');
-    pinned = ismember(packageName, MIP_PINNED_PACKAGES);
 end

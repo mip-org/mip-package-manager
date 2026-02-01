@@ -1,13 +1,13 @@
 function load(packageName, varargin)
-    % load - Load a mip package into MATLAB path
-    %
-    % Usage:
-    %   mip.load('packageName')
-    %   mip.load('packageName', '--pin')
-    %
-    % This function loads the specified package from ~/.mip/packages by
-    % executing its load_package.m file. Use '--pin' to automatically pin the package.
-    
+%LOAD   Load a mip package into the MATLAB path.
+%
+% Usage:
+%   mip.load('packageName')
+%   mip.load('packageName', '--pin')
+%
+% This function loads the specified package from ~/.mip/packages by
+% executing its load_package.m file. Use '--pin' to automatically pin the package.
+
     % Check for --pin flag in arguments
     pinPackage = false;
     remainingArgs = {};
@@ -18,7 +18,7 @@ function load(packageName, varargin)
             remainingArgs{end+1} = varargin{i}; %#ok<*AGROW>
         end
     end
-    
+
     % Parse optional arguments for internal use
     p = inputParser;
     addParameter(p, 'loadingStack', {}, @iscell);
@@ -26,7 +26,7 @@ function load(packageName, varargin)
     parse(p, remainingArgs{:});
     loadingStack = p.Results.loadingStack;
     isDirect = p.Results.isDirect;
-    
+
     % Check for circular dependencies
     if ismember(packageName, loadingStack)
         cycle = strjoin([loadingStack, {packageName}], ' -> ');
@@ -40,27 +40,27 @@ function load(packageName, varargin)
     % Get the mip packages directory
     packagesDir = mip.utils.get_packages_dir();
     packageDir = fullfile(packagesDir, packageName);
-    
+
     % Check if package exists
     if ~exist(packageDir, 'dir')
         error('mip:packageNotFound', ...
               'Package "%s" is not installed. Run "mip install %s" first.', ...
               packageName, packageName);
     end
-    
+
     % Check if package is already loaded
-    if isPackageLoaded(packageName)
+    if mip.utils.is_loaded(packageName)
         % If this is a direct load and the package was previously
         % loaded as a dependency, mark it as direct now
-        if isDirect && ~isPackageDirectlyLoaded(packageName)
-            markPackageAsDirect(packageName);
+        if isDirect && ~mip.utils.is_directly_loaded(packageName)
+            mip.utils.key_value_append('MIP_DIRECTLY_LOADED_PACKAGES', packageName);
             fprintf('Package "%s" is already loaded (now marked as direct)\n', packageName);
         else
             fprintf('Package "%s" is already loaded\n', packageName);
         end
-        return;
+        return
     end
-    
+
     % Check for mip.json and process dependencies
     mipJsonPath = fullfile(packageDir, 'mip.json');
     if exist(mipJsonPath, 'file')
@@ -77,7 +77,7 @@ function load(packageName, varargin)
                         packageName, strjoin(mipConfig.dependencies, ', '));
                 for i = 1:length(mipConfig.dependencies)
                     dep = mipConfig.dependencies{i};
-                    if ~isPackageLoaded(dep)
+                    if ~mip.utils.is_loaded(dep)
                         mip.load(dep, 'loadingStack', loadingStack, 'isDirect', false);
                     else
                         fprintf('  Dependency "%s" is already loaded\n', dep);
@@ -90,7 +90,7 @@ function load(packageName, varargin)
                     packageName, ME.message);
         end
     end
-    
+
     % Look for load_package.m file
     loadFile = fullfile(packageDir, 'load_package.m');
     if ~exist(loadFile, 'file')
@@ -112,45 +112,15 @@ function load(packageName, varargin)
     cd(originalDir);
 
     % Mark package as loaded
-    markPackageAsLoaded(packageName, isDirect);
+    mip.utils.key_value_append('MIP_LOADED_PACKAGES', packageName);
+
+    % Track directly loaded packages separately
+    if isDirect
+        mip.utils.key_value_append('MIP_DIRECTLY_LOADED_PACKAGES', packageName);
+    end
 
     % Pin package if requested
     if pinPackage && isDirect
         mip.pin(packageName);
     end
-end
-
-function loaded = isPackageLoaded(packageName)
-    % Helper function to check if a package has already been loaded
-    MIP_LOADED_PACKAGES = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
-    loaded = ismember(packageName, MIP_LOADED_PACKAGES);
-end
-
-function markPackageAsLoaded(packageName, isDirect)
-    % Helper function to mark a package as loaded
-    MIP_LOADED_PACKAGES = mip.utils.get_key_value('MIP_LOADED_PACKAGES');
-    if ~ismember(packageName, MIP_LOADED_PACKAGES)
-        MIP_LOADED_PACKAGES{end+1} = packageName;
-        mip.utils.set_key_value('MIP_LOADED_PACKAGES', MIP_LOADED_PACKAGES);
-    end
-
-    % Track directly loaded packages separately
-    if isDirect
-        markPackageAsDirect(packageName);
-    end
-end
-
-function markPackageAsDirect(packageName)
-    % Helper function to mark a package as directly loaded
-    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.get_key_value('MIP_DIRECTLY_LOADED_PACKAGES');
-    if ~ismember(packageName, MIP_DIRECTLY_LOADED_PACKAGES)
-        MIP_DIRECTLY_LOADED_PACKAGES{end+1} = packageName;
-        mip.utils.set_key_value('MIP_DIRECTLY_LOADED_PACKAGES', MIP_DIRECTLY_LOADED_PACKAGES);
-    end
-end
-
-function direct = isPackageDirectlyLoaded(packageName)
-    % Helper function to check if a package is directly loaded
-    MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.get_key_value('MIP_DIRECTLY_LOADED_PACKAGES');
-    direct = ismember(packageName, MIP_DIRECTLY_LOADED_PACKAGES);
 end
