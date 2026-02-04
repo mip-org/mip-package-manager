@@ -124,6 +124,9 @@ function pruneUnusedPackages(packagesDir)
             fprintf('  Pruned package "%s"\n', pkg);
         end
     end
+    
+    % After pruning, check for broken dependencies
+    checkForBrokenDependencies(packagesDir);
 end
 
 function deps = getAllDependencies(packageName, packagesDir)
@@ -160,6 +163,56 @@ function deps = getAllDependencies(packageName, packagesDir)
         warning('mip:jsonParseError', ...
                 'Could not parse mip.json for package "%s": %s', ...
                 packageName, ME.message);
+    end
+end
+
+function checkForBrokenDependencies(packagesDir)
+% Check if any loaded packages now have missing dependencies
+% and warn the user
+
+    MIP_LOADED_PACKAGES = mip.utils.key_value_get('MIP_LOADED_PACKAGES');
+    
+    if isempty(MIP_LOADED_PACKAGES)
+        return
+    end
+
+    % Check each loaded package for broken dependencies
+    brokenDeps = {};
+    for i = 1:length(MIP_LOADED_PACKAGES)
+        pkg = MIP_LOADED_PACKAGES{i};
+        packageDir = fullfile(packagesDir, pkg);
+        mipJsonPath = fullfile(packageDir, 'mip.json');
+        
+        if ~exist(mipJsonPath, 'file')
+            continue
+        end
+        
+        try
+            % Read and parse mip.json
+            fid = fopen(mipJsonPath, 'r');
+            jsonText = fread(fid, '*char')';
+            fclose(fid);
+            mipConfig = jsondecode(jsonText);
+            
+            % Check if any dependencies are missing (not loaded)
+            if isfield(mipConfig, 'dependencies') && ~isempty(mipConfig.dependencies)
+                for j = 1:length(mipConfig.dependencies)
+                    dep = mipConfig.dependencies{j};
+                    if ~mip.utils.is_loaded(dep)
+                        brokenDeps{end+1} = sprintf('Package "%s" depends on "%s" which is no longer loaded', pkg, dep); %#ok<*AGROW>
+                    end
+                end
+            end
+        catch ME
+            % Silently ignore parse errors (already warned elsewhere)
+        end
+    end
+    
+    % Warn about broken dependencies
+    if ~isempty(brokenDeps)
+        warning('mip:brokenDependencies', ...
+                'Warning: Some loaded packages have missing dependencies:\n  %s', ...
+                strjoin(brokenDeps, '\n  '));
     end
 end
 
