@@ -1,0 +1,19 @@
+{
+  "name": "text_Z",
+  "description": "",
+  "version": "0.1.0",
+  "build_number": 1,
+  "dependencies": ["test_Z"],
+  "homepage": "",
+  "repository": "",
+  "license": "BSD-2-Clause",
+  "matlab_tag": "any",
+  "abi_tag": "none",
+  "platform_tag": "any",
+  "usage_examples": [],
+  "exposed_symbols": [],
+  "timestamp": "",
+  "prepare_duration": 0.25,
+  "compile_duration": 0,
+  "mhl_url": ""
+}
