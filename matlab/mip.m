@@ -13,6 +13,7 @@ function varargout = mip(command, varargin)
 %   mip find-name-collisions        - Find symbol name collisions
 %   mip arch                        - Display current architecture tag
 %   mip info <package>              - Display package information
+%   mip avail                       - List available packages in repository
 %   mip index                       - Display the mip package index URL.
 %   mip help [command]              - Show help text for command
 
@@ -84,6 +85,9 @@ switch command
         end
         packageName = varargin{1};
         mip.info(packageName);
+
+    case 'avail'
+        mip.avail();
 
     case 'index'
         fprintf('%s\n', mip.index());
