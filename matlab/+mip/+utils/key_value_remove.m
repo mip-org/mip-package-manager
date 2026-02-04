@@ -5,7 +5,7 @@ function key_value_remove(key, value)
 % command.
 
 values = mip.utils.key_value_get(key);
-values(isequal(values, value)) = [];
+values(ismember(values, value)) = [];
 mip.utils.key_value_set(key, values);
 
 end
