@@ -273,4 +273,7 @@ function unloadAll()
     if ~isempty(MIP_PINNED_PACKAGES)
         fprintf('\nPinned packages remain loaded: %s\n', strjoin(MIP_PINNED_PACKAGES, ', '));
     end
+    
+    % Check for broken dependencies among remaining packages
+    checkForBrokenDependencies(packagesDir);
 end

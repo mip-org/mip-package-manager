@@ -8,8 +8,9 @@ function uninstall(varargin)
 % Args:
 %   Package name(s) to uninstall, as strings or char arrays.
 %
-% This function uninstalls packages and all packages that depend on them.
-% User confirmation is required before proceeding.
+% This function uninstalls packages and then prunes any packages that
+% are no longer needed (packages that were installed as dependencies
+% but are not dependencies of any directly installed package).
 
     if nargin < 1
         error('mip:uninstall:noPackage', ...
@@ -43,46 +44,11 @@ function uninstall(varargin)
         return
     end
 
-    % Find all packages that depend on any of the requested packages
-    if length(requestedPackages) == 1
-        fprintf('Scanning for packages that depend on "%s"...\n', requestedPackages{1});
-    else
-        fprintf('Scanning for packages that depend on %d packages...\n', length(requestedPackages));
-    end
-
-    allToUninstall = requestedPackages;
-    for i = 1:length(requestedPackages)
-        pkgName = requestedPackages{i};
-        reverseDeps = mip.dependency.find_reverse_dependencies(pkgName, packagesDir);
-        allToUninstall = [allToUninstall, reverseDeps];
-    end
-    allToUninstall = unique(allToUninstall, 'stable');
-
-    % Sort packages in proper uninstallation order (reverse dependencies first)
-    toUninstall = buildUninstallOrder(allToUninstall, packagesDir);
-
-    % Display uninstallation plan
-    if length(toUninstall) > 1
-        fprintf('\nThe following packages will be uninstalled:\n');
-        for i = 1:length(toUninstall)
-            pkg = toUninstall{i};
-            if ismember(pkg, requestedPackages)
-                fprintf('  - %s\n', pkg);
-            else
-                % Find which requested packages this depends on
-                fprintf('  - %s (depends on a package being uninstalled)\n', pkg);
-            end
-        end
-        fprintf('\n');
-    end
-
     % Confirm uninstallation
-    % Note: input() may not work in all MATLAB contexts (e.g., deployed applications)
-    % This is a limitation of MATLAB's interactive input capabilities
-    if length(toUninstall) == 1
-        response = input(sprintf('Are you sure you want to uninstall "%s"? (y/n): ', toUninstall{1}), 's');
+    if length(requestedPackages) == 1
+        response = input(sprintf('Are you sure you want to uninstall "%s"? (y/n): ', requestedPackages{1}), 's');
     else
-        response = input(sprintf('Are you sure you want to uninstall these %d packages? (y/n): ', length(toUninstall)), 's');
+        response = input(sprintf('Are you sure you want to uninstall these %d packages? (y/n): ', length(requestedPackages)), 's');
     end
 
     if ~strcmpi(response, 'y') && ~strcmpi(response, 'yes')
@@ -90,72 +56,187 @@ function uninstall(varargin)
         return
     end
 
-    % Execute uninstallations
+    % Uninstall each requested package
     fprintf('\n');
-    uninstalledCount = 0;
-    for i = 1:length(toUninstall)
-        pkg = toUninstall{i};
+    for i = 1:length(requestedPackages)
+        pkg = requestedPackages{i};
         pkgDir = fullfile(packagesDir, pkg);
-        if exist(pkgDir, 'dir')
-            try
-                fprintf('Uninstalling "%s"...\n', pkg);
-                rmdir(pkgDir, 's');
-                fprintf('Successfully uninstalled "%s"\n', pkg);
-                uninstalledCount = uninstalledCount + 1;
-            catch ME
-                error('mip:uninstallFailed', ...
-                      'Failed to uninstall package "%s": %s', pkg, ME.message);
+        
+        try
+            fprintf('Uninstalling "%s"...\n', pkg);
+            rmdir(pkgDir, 's');
+            fprintf('Uninstalled package "%s"\n', pkg);
+        catch ME
+            error('mip:uninstallFailed', ...
+                  'Failed to uninstall package "%s": %s', pkg, ME.message);
+        end
+        
+        % Remove from directly installed packages
+        mip.utils.remove_directly_installed(pkg);
+    end
+
+    % Prune packages that are no longer needed
+    pruneUnusedPackages(packagesDir);
+end
+
+function pruneUnusedPackages(packagesDir)
+% Prune packages that are no longer needed
+% A package is needed if it is:
+% 1. Directly installed by the user, OR
+% 2. A dependency of a directly installed package
+
+    % Get all installed packages
+    installedPackages = {};
+    if exist(packagesDir, 'dir')
+        dirContents = dir(packagesDir);
+        for i = 1:length(dirContents)
+            if dirContents(i).isdir && ~startsWith(dirContents(i).name, '.')
+                installedPackages{end+1} = dirContents(i).name; %#ok<*AGROW>
             end
         end
     end
-    fprintf('\nSuccessfully uninstalled %d package(s)\n', uninstalledCount);
+    
+    if isempty(installedPackages)
+        return
+    end
+    
+    directlyInstalled = mip.utils.get_directly_installed();
+    
+    % Build set of all needed packages (directly installed + their dependencies)
+    neededPackages = {};
+    for i = 1:length(directlyInstalled)
+        directPkg = directlyInstalled{i};
+        % Only consider if the package is still installed
+        if ismember(directPkg, installedPackages)
+            neededPackages = [neededPackages, getAllDependencies(directPkg, packagesDir)];
+        end
+    end
+    
+    % Add directly installed packages themselves
+    neededPackages = unique([directlyInstalled, neededPackages]);
+    
+    % Find packages to prune (installed but not needed)
+    packagesToPrune = {};
+    for i = 1:length(installedPackages)
+        pkg = installedPackages{i};
+        if ~ismember(pkg, neededPackages)
+            packagesToPrune{end+1} = pkg;
+        end
+    end
+    
+    % Prune each unnecessary package
+    if ~isempty(packagesToPrune)
+        fprintf('\nPruning unnecessary packages: %s\n', strjoin(packagesToPrune, ', '));
+        for i = 1:length(packagesToPrune)
+            pkg = packagesToPrune{i};
+            packageDir = fullfile(packagesDir, pkg);
+            
+            try
+                rmdir(packageDir, 's');
+                fprintf('  Pruned package "%s"\n', pkg);
+            catch ME
+                warning('mip:pruneFailed', ...
+                        'Failed to prune package "%s": %s', pkg, ME.message);
+            end
+        end
+    end
+    
+    % After pruning, check for broken dependencies
+    checkForBrokenDependencies(packagesDir);
 end
 
-function uninstallOrder = buildUninstallOrder(packagesToUninstall, packagesDir)
-% Sort packages in reverse topological order for uninstallation
-% Packages with reverse dependencies should be uninstalled first
+function deps = getAllDependencies(packageName, packagesDir)
+    % Recursively get all dependencies of a package
+    deps = {};
 
-    % Build dependency graph for packages to uninstall
-    dependencies = containers.Map('KeyType', 'char', 'ValueType', 'any');
+    packageDir = fullfile(packagesDir, packageName);
+    mipJsonPath = fullfile(packageDir, 'mip.json');
 
-    for i = 1:length(packagesToUninstall)
-        pkgName = packagesToUninstall{i};
-        pkgDir = fullfile(packagesDir, pkgName);
-        try
-            pkgInfo = mip.utils.read_package_json(pkgDir);
-            deps = pkgInfo.dependencies;
-            % read_package_json now always returns a cell array
-        catch
-            deps = {};
-        end
-        dependencies(pkgName) = deps;
+    if ~exist(mipJsonPath, 'file')
+        return
     end
 
-    % Topological sort - but we want reverse order for uninstallation
-    visited = containers.Map('KeyType', 'char', 'ValueType', 'logical');
-    uninstallOrder = {};
+    try
+        % Read and parse mip.json
+        fid = fopen(mipJsonPath, 'r');
+        jsonText = fread(fid, '*char')';
+        fclose(fid);
+        mipConfig = jsondecode(jsonText);
 
-    function visit(pkgName)
-        if visited.isKey(pkgName)
-            return
-        end
-        visited(pkgName) = true;
-
-        % Visit packages that depend on this one first (from our uninstall set)
-        for j = 1:length(packagesToUninstall)
-            otherPkg = packagesToUninstall{j};
-            if ~strcmp(otherPkg, pkgName) && dependencies.isKey(otherPkg)
-                otherDeps = dependencies(otherPkg);
-                if ismember(pkgName, otherDeps)
-                    visit(otherPkg);
+        % Get direct dependencies
+        if isfield(mipConfig, 'dependencies') && ~isempty(mipConfig.dependencies)
+            for i = 1:length(mipConfig.dependencies)
+                dep = mipConfig.dependencies{i};
+                if ~ismember(dep, deps)
+                    deps{end+1} = dep;
+                    % Recursively get dependencies of this dependency
+                    transitiveDeps = getAllDependencies(dep, packagesDir);
+                    deps = unique([deps, transitiveDeps]);
                 end
             end
         end
+    catch ME
+        warning('mip:jsonParseError', ...
+                'Could not parse mip.json for package "%s": %s', ...
+                packageName, ME.message);
+    end
+end
 
-        uninstallOrder = [uninstallOrder, {pkgName}];
+function checkForBrokenDependencies(packagesDir)
+% Check if any installed packages now have missing dependencies
+% and warn the user
+
+    % Get all installed packages
+    installedPackages = {};
+    if exist(packagesDir, 'dir')
+        dirContents = dir(packagesDir);
+        for i = 1:length(dirContents)
+            if dirContents(i).isdir && ~startsWith(dirContents(i).name, '.')
+                installedPackages{end+1} = dirContents(i).name; %#ok<*AGROW>
+            end
+        end
+    end
+    
+    if isempty(installedPackages)
+        return
     end
 
-    for i = 1:length(packagesToUninstall)
-        visit(packagesToUninstall{i});
+    % Check each installed package for broken dependencies
+    brokenDeps = {};
+    for i = 1:length(installedPackages)
+        pkg = installedPackages{i};
+        packageDir = fullfile(packagesDir, pkg);
+        mipJsonPath = fullfile(packageDir, 'mip.json');
+        
+        if ~exist(mipJsonPath, 'file')
+            continue
+        end
+        
+        try
+            % Read and parse mip.json
+            fid = fopen(mipJsonPath, 'r');
+            jsonText = fread(fid, '*char')';
+            fclose(fid);
+            mipConfig = jsondecode(jsonText);
+            
+            % Check if any dependencies are missing (not installed)
+            if isfield(mipConfig, 'dependencies') && ~isempty(mipConfig.dependencies)
+                for j = 1:length(mipConfig.dependencies)
+                    dep = mipConfig.dependencies{j};
+                    if ~ismember(dep, installedPackages)
+                        brokenDeps{end+1} = sprintf('Package "%s" depends on "%s" which is no longer installed', pkg, dep);
+                    end
+                end
+            end
+        catch ME
+            % Silently ignore parse errors (already warned elsewhere)
+        end
+    end
+    
+    % Warn about broken dependencies
+    if ~isempty(brokenDeps)
+        warning('mip:brokenDependencies', ...
+                'Warning: Some installed packages have missing dependencies:\n  %s', ...
+                strjoin(brokenDeps, '\n  '));
     end
 end

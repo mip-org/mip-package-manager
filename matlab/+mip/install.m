@@ -208,6 +208,11 @@ function count = installFromRepository(repoPackages, packagesDir)
                 downloadAndInstall(pkgName, pkgInfo, packagesDir);
                 count = count + 1;
             end
+            
+            % Mark requested packages as directly installed
+            for i = 1:length(repoPackages)
+                mip.utils.add_directly_installed(repoPackages{i});
+            end
         end
 
     catch ME
@@ -256,6 +261,10 @@ function success = installFromMhl(mhlSource, packagesDir)
         movefile(extractDir, pkgDir);
 
         fprintf('Successfully installed "%s"\n', packageName);
+        
+        % Mark as directly installed
+        mip.utils.add_directly_installed(packageName);
+        
         success = true;
 
     catch ME
