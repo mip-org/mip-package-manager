@@ -102,7 +102,7 @@ try
     
     % Check if package is loaded
     isLoaded = mip.utils.is_loaded(packageName);
-    isPinned = mip.utils.is_pinned(packageName);
+    isSticky = mip.utils.is_sticky(packageName);
     
     % Display package information
     fprintf('\n');
@@ -135,8 +135,8 @@ try
     
     % Show loaded status
     if isLoaded
-        if isPinned
-            fprintf('Loaded: Yes [PINNED]\n');
+        if isSticky
+            fprintf('Loaded: Yes (sticky)\n');
         else
             fprintf('Loaded: Yes\n');
         end
