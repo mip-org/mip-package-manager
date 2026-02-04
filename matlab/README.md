@@ -45,11 +45,8 @@ mip install https://example.com/package.mhl
 ### Listing Packages
 
 ```matlab
-% List all installed packages
+% List all installed packages (shows loaded packages at the top)
 mip list
-
-% List loaded packages
-mip list-loaded
 
 % Get detailed package information
 mip info chebfun

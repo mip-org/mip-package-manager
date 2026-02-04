@@ -10,7 +10,6 @@ function varargout = mip(command, varargin)
 %   mip unload --all                - Unload all non-pinned packages
 %   mip pin <package>               - Pin a loaded package
 %   mip unpin <package>             - Unpin a package
-%   mip list-loaded                 - List currently loaded packages
 %   mip find-name-collisions        - Find symbol name collisions
 %   mip arch                        - Display current architecture tag
 %   mip info <package>              - Display package information
@@ -72,9 +71,6 @@ switch command
         end
         packageName = varargin{1};
         mip.unpin(packageName);
-
-    case 'list-loaded'
-        mip.list_loaded();
 
     case 'find-name-collisions'
         mip.find_name_collisions();
