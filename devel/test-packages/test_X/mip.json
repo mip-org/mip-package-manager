@@ -1,9 +1,9 @@
 {
-  "name": "text_X",
+  "name": "test_X",
   "description": "",
   "version": "0.1.0",
   "build_number": 1,
-  "dependencies": ["test_X1"],
+  "dependencies": ["test_X1", "test_X2"],
   "homepage": "",
   "repository": "",
   "license": "BSD-2-Clause",
