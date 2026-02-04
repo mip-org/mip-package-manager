@@ -35,7 +35,7 @@ switch command
         if nargin < 2
             error('mip:noPackage', 'At least one package name required for uninstall command.');
         end
-        mip.uninstall(varargin);
+        mip.uninstall(varargin{:});
 
     case 'list'
         mip.list();
