@@ -108,7 +108,7 @@ function pruneUnusedPackages(packagesDir)
         directPkg = directlyInstalled{i};
         % Only consider if the package is still installed
         if ismember(directPkg, installedPackages)
-            neededPackages = [neededPackages, getAllDependencies(directPkg, packagesDir)];
+            neededPackages = [neededPackages, getAllDependencies(directPkg, packagesDir, {})];
         end
     end
     
@@ -145,9 +145,17 @@ function pruneUnusedPackages(packagesDir)
     checkForBrokenDependencies(packagesDir);
 end
 
-function deps = getAllDependencies(packageName, packagesDir)
+function deps = getAllDependencies(packageName, packagesDir, visited)
     % Recursively get all dependencies of a package
+    % visited: cell array of package names already being processed to prevent infinite recursion
     deps = {};
+
+    % Prevent infinite recursion by tracking visited packages
+    if ismember(packageName, visited)
+        return
+    end
+    
+    visited = [visited, {packageName}];
 
     packageDir = fullfile(packagesDir, packageName);
     mipJsonPath = fullfile(packageDir, 'mip.json');
@@ -170,7 +178,7 @@ function deps = getAllDependencies(packageName, packagesDir)
                 if ~ismember(dep, deps)
                     deps{end+1} = dep;
                     % Recursively get dependencies of this dependency
-                    transitiveDeps = getAllDependencies(dep, packagesDir);
+                    transitiveDeps = getAllDependencies(dep, packagesDir, visited);
                     deps = unique([deps, transitiveDeps]);
                 end
             end
