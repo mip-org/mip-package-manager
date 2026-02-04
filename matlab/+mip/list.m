@@ -7,13 +7,13 @@ function list()
 % Displays all currently installed packages with their versions.
 % Loaded packages are shown in a separate section at the top.
 % An asterisk (*) indicates a directly loaded package.
-% [pinned] indicates a pinned package.
+% [sticky] indicates a sticky package.
 %
 % Example:
 %   mip.list()
 %   % Output:
 %   % === Loaded Packages ===
-%   %  * chebfun (5.7.0) [pinned]
+%   %  * chebfun (5.7.0) [sticky]
 %   %    dependency1 (1.0.0)
 %   %
 %   % === Other Installed Packages ===
@@ -41,10 +41,10 @@ if isempty(packages)
     return
 end
 
-% Get loaded and pinned packages
+% Get loaded and sticky packages
 MIP_LOADED_PACKAGES          = mip.utils.key_value_get('MIP_LOADED_PACKAGES');
 MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.key_value_get('MIP_DIRECTLY_LOADED_PACKAGES');
-MIP_PINNED_PACKAGES          = mip.utils.key_value_get('MIP_PINNED_PACKAGES');
+MIP_STICKY_PACKAGES          = mip.utils.key_value_get('MIP_STICKY_PACKAGES');
 
 % Categorize packages into loaded and not loaded
 loadedPackages = {};
@@ -81,9 +81,9 @@ if ~isempty(loadedPackages)
             % Ignore errors reading mip.json
         end
 
-        % Check if direct and pinned
+        % Check if direct and sticky
         isDirect = ismember(pkgName, MIP_DIRECTLY_LOADED_PACKAGES);
-        isPinned = ismember(pkgName, MIP_PINNED_PACKAGES);
+        isSticky = ismember(pkgName, MIP_STICKY_PACKAGES);
         
         % Build the display line with proper indentation
         if isDirect
@@ -94,9 +94,9 @@ if ~isempty(loadedPackages)
         
         pkgLine = sprintf('%s %s (%s)', prefix, pkgName, version);
         
-        % Add pinned indicator
-        if isPinned
-            pkgLine = sprintf('%s [pinned]', pkgLine);
+        % Add sticky indicator
+        if isSticky
+            pkgLine = sprintf('%s [sticky]', pkgLine);
         end
         
         fprintf('%s\n', pkgLine);

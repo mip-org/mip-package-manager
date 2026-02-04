@@ -3,17 +3,18 @@ function load(packageName, varargin)
 %
 % Usage:
 %   mip.load('packageName')
-%   mip.load('packageName', '--pin')
+%   mip.load('packageName', '--sticky')
 %
 % This function loads the specified package from ~/.mip/packages by
-% executing its load_package.m file. Use '--pin' to automatically pin the package.
+% executing its load_package.m file. Use '--sticky' to mark the package as sticky,
+% which prevents it from being unloaded with 'mip unload --all'.
 
-    % Check for --pin flag in arguments
-    pinPackage = false;
+    % Check for --sticky flag in arguments
+    stickyPackage = false;
     remainingArgs = {};
     for i = 1:length(varargin)
-        if ischar(varargin{i}) && strcmp(varargin{i}, '--pin')
-            pinPackage = true;
+        if ischar(varargin{i}) && strcmp(varargin{i}, '--sticky')
+            stickyPackage = true;
         else
             remainingArgs{end+1} = varargin{i}; %#ok<*AGROW>
         end
@@ -57,6 +58,13 @@ function load(packageName, varargin)
             fprintf('Package "%s" is already loaded (now marked as direct)\n', packageName);
         else
             fprintf('Package "%s" is already loaded\n', packageName);
+        end
+        % If --sticky was specified, add to sticky packages
+        if stickyPackage
+            if ~mip.utils.is_sticky(packageName)
+                mip.utils.key_value_append('MIP_STICKY_PACKAGES', packageName);
+                fprintf('Package "%s" is now sticky\n', packageName);
+            end
         end
         return
     end
@@ -119,8 +127,9 @@ function load(packageName, varargin)
         mip.utils.key_value_append('MIP_DIRECTLY_LOADED_PACKAGES', packageName);
     end
 
-    % Pin package if requested
-    if pinPackage && isDirect
-        mip.pin(packageName);
+    % Mark package as sticky if requested
+    if stickyPackage
+        mip.utils.key_value_append('MIP_STICKY_PACKAGES', packageName);
+        fprintf('Package "%s" is now sticky\n', packageName);
     end
 end

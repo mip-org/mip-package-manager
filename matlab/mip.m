@@ -5,11 +5,10 @@ function varargout = mip(command, varargin)
 %   mip install <package> [...]     - Install one or more packages
 %   mip uninstall <package> [...]   - Uninstall one or more packages
 %   mip list                        - List installed packages
-%   mip load <package> [--pin]      - Load a package into MATLAB path
+%   mip load <package> [--sticky]   - Load a package into MATLAB path
 %   mip unload <package>            - Unload a package from MATLAB path
-%   mip unload --all                - Unload all non-pinned packages
-%   mip pin <package>               - Pin a loaded package
-%   mip unpin <package>             - Unpin a package
+%   mip unload --all                - Unload all non-sticky packages
+%   mip unload --all --force        - Unload all packages (including sticky)
 %   mip find-name-collisions        - Find symbol name collisions
 %   mip arch                        - Display current architecture tag
 %   mip info <package>              - Display package information
@@ -52,26 +51,7 @@ switch command
         if nargin < 2
             error('mip:noPackage', 'No package specified for unload command.');
         end
-        if strcmp(varargin{1}, '--all')
-            mip.unload('--all');
-        else
-            packageName = varargin{1};
-            mip.unload(packageName);
-        end
-
-    case 'pin'
-        if nargin < 2
-            error('mip:noPackage', 'No package specified for pin command.');
-        end
-        packageName = varargin{1};
-        mip.pin(packageName);
-
-    case 'unpin'
-        if nargin < 2
-            error('mip:noPackage', 'No package specified for unpin command.');
-        end
-        packageName = varargin{1};
-        mip.unpin(packageName);
+        mip.unload(varargin{:});
 
     case 'find-name-collisions'
         mip.find_name_collisions();

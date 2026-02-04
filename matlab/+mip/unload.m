@@ -1,34 +1,46 @@
-function unload(packageName)
+function unload(varargin)
 %UNLOAD   Unload a mip package from MATLAB path.
 %
 % Usage:
 %   mip.unload('packageName')
 %   mip.unload('--all')
+%   mip.unload('--all', '--force')  % force unload (including sticky packages)
 %
 % This function unloads the specified package by executing its
 % unload_package.m file (if it exists) and then prunes any packages that
 % are no longer needed (packages that were loaded as dependencies
 % but are not dependencies of any directly loaded package).
 %
-% Use '--all' to unload all non-pinned packages.
+% Use '--all' to unload all non-sticky packages.
+% Use '--all --force' to unload all packages including sticky ones.
 
+    % Check for --all and --force flags
+    hasAll = any(strcmp(varargin, '--all'));
+    hasForce = any(strcmp(varargin, '--force'));
+    
     % Handle --all flag
-    if strcmp(packageName, '--all')
-        unloadAll();
+    if hasAll
+        unloadAll(hasForce);
         return
+    end
+    
+    % Get package name (first non-flag argument)
+    packageName = '';
+    for i = 1:length(varargin)
+        if ~startsWith(varargin{i}, '--')
+            packageName = varargin{i};
+            break;
+        end
+    end
+    
+    if isempty(packageName)
+        error('mip:noPackage', 'No package name specified for unload command.');
     end
 
     % Check if package is loaded
     if ~mip.utils.is_loaded(packageName)
         fprintf('Package "%s" is not currently loaded\n', packageName);
         return
-    end
-
-    % Warn if package is pinned
-    if mip.utils.is_pinned(packageName)
-        warning('mip:pinnedPackage', ...
-                'Package "%s" is pinned. It will be unloaded anyway.', ...
-                packageName);
     end
 
     % Get the mip packages directory
@@ -38,8 +50,8 @@ function unload(packageName)
     % Execute unload_package.m if it exists
     executeUnload(packageDir, packageName);
 
-    % Remove from pinned packages
-    mip.utils.key_value_remove('MIP_PINNED_PACKAGES', packageName);
+    % Remove from sticky packages
+    mip.utils.key_value_remove('MIP_STICKY_PACKAGES', packageName);
 
     % Remove from directly loaded packages
     mip.utils.key_value_remove('MIP_DIRECTLY_LOADED_PACKAGES', packageName);
@@ -216,12 +228,12 @@ function checkForBrokenDependencies(packagesDir)
     end
 end
 
-function unloadAll()
-% Unload all non-pinned packages
+function unloadAll(forceUnload)
+% Unload all non-sticky packages (or all packages if forceUnload is true)
 
     MIP_LOADED_PACKAGES          = mip.utils.key_value_get('MIP_LOADED_PACKAGES');
     MIP_DIRECTLY_LOADED_PACKAGES = mip.utils.key_value_get('MIP_DIRECTLY_LOADED_PACKAGES');
-    MIP_PINNED_PACKAGES          = mip.utils.key_value_get('MIP_PINNED_PACKAGES');
+    MIP_STICKY_PACKAGES          = mip.utils.key_value_get('MIP_STICKY_PACKAGES');
 
     if isempty(MIP_LOADED_PACKAGES)
         fprintf('No packages are currently loaded\n');
@@ -231,24 +243,38 @@ function unloadAll()
     % Get the mip packages directory
     packagesDir = mip.utils.get_packages_dir();
 
-    % Find packages to unload (all except pinned)
+    % Find packages to unload
     packagesToUnload = {};
-    for i = 1:length(MIP_LOADED_PACKAGES)
-        pkg = MIP_LOADED_PACKAGES{i};
-        if ~ismember(pkg, MIP_PINNED_PACKAGES)
-            packagesToUnload{end+1} = pkg;
+    if forceUnload
+        % Unload all packages
+        packagesToUnload = MIP_LOADED_PACKAGES;
+    else
+        % Unload all except sticky packages
+        for i = 1:length(MIP_LOADED_PACKAGES)
+            pkg = MIP_LOADED_PACKAGES{i};
+            if ~ismember(pkg, MIP_STICKY_PACKAGES)
+                packagesToUnload{end+1} = pkg;
+            end
         end
     end
 
     if isempty(packagesToUnload)
-        fprintf('No non-pinned packages to unload\n');
-        if ~isempty(MIP_PINNED_PACKAGES)
-            fprintf('Pinned packages remain: %s\n', strjoin(MIP_PINNED_PACKAGES, ', '));
+        fprintf('No packages to unload\n');
+        if ~forceUnload && ~isempty(MIP_STICKY_PACKAGES)
+            fprintf('Sticky packages remain: %s\n', strjoin(MIP_STICKY_PACKAGES, ', '));
         end
         return
     end
 
-    fprintf('Unloading all non-pinned packages: %s\n', strjoin(packagesToUnload, ', '));
+    if forceUnload
+        fprintf('Unloading all packages: %s\n', strjoin(packagesToUnload, ', '));
+    else
+        if ~isempty(MIP_STICKY_PACKAGES)
+            fprintf('Unloading all non-sticky packages: %s\n', strjoin(packagesToUnload, ', '));
+        else
+            fprintf('Unloading all packages: %s\n', strjoin(packagesToUnload, ', '));
+        end
+    end
 
     % Unload each package
     for i = 1:length(packagesToUnload)
@@ -260,19 +286,25 @@ function unloadAll()
         fprintf('  Unloaded package "%s"\n', pkg);
     end
 
-    % Keep only pinned packages in loaded list
-    MIP_LOADED_PACKAGES = MIP_PINNED_PACKAGES;
-    mip.utils.key_value_set('MIP_LOADED_PACKAGES', MIP_LOADED_PACKAGES);
-
-    % Keep only pinned packages in directly loaded list
-    MIP_DIRECTLY_LOADED_PACKAGES = MIP_DIRECTLY_LOADED_PACKAGES(    ...
-        ismember(MIP_DIRECTLY_LOADED_PACKAGES, MIP_PINNED_PACKAGES) ...
-    );
-    mip.utils.key_value_set('MIP_DIRECTLY_LOADED_PACKAGES', MIP_DIRECTLY_LOADED_PACKAGES);
-
-    if ~isempty(MIP_PINNED_PACKAGES)
-        fprintf('\nPinned packages remain loaded: %s\n', strjoin(MIP_PINNED_PACKAGES, ', '));
+    % Update global variables
+    if forceUnload
+        % Remove all packages
+        MIP_LOADED_PACKAGES = {};
+        MIP_DIRECTLY_LOADED_PACKAGES = {};
+        MIP_STICKY_PACKAGES = {};
+    else
+        % Keep only sticky packages in loaded list
+        MIP_LOADED_PACKAGES = MIP_STICKY_PACKAGES;
+        
+        % Keep only sticky packages in directly loaded list
+        MIP_DIRECTLY_LOADED_PACKAGES = MIP_DIRECTLY_LOADED_PACKAGES(    ...
+            ismember(MIP_DIRECTLY_LOADED_PACKAGES, MIP_STICKY_PACKAGES) ...
+        );
     end
+    
+    mip.utils.key_value_set('MIP_LOADED_PACKAGES', MIP_LOADED_PACKAGES);
+    mip.utils.key_value_set('MIP_DIRECTLY_LOADED_PACKAGES', MIP_DIRECTLY_LOADED_PACKAGES);
+    mip.utils.key_value_set('MIP_STICKY_PACKAGES', MIP_STICKY_PACKAGES);
     
     % Check for broken dependencies among remaining packages
     checkForBrokenDependencies(packagesDir);

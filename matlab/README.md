@@ -68,18 +68,17 @@ mip uninstall package1 package2
 % Load a package
 mip load chebfun
 
-% Load and pin a package
-mip load chebfun --pin
+% Load and mark a package as sticky
+mip load chebfun --sticky
 
 % Unload a package
 mip unload chebfun
 
-% Unload all non-pinned packages
+% Unload all non-sticky packages
 mip unload --all
 
-% Pin/unpin packages
-mip pin chebfun
-mip unpin chebfun
+% Unload all packages (including sticky ones)
+mip unload --all --force
 ```
 
 ### Utility Commands
@@ -120,8 +119,6 @@ matlab/
 │   ├── info.m                 # Package info command
 │   ├── load.m                 # Load package
 │   ├── unload.m               # Unload package
-│   ├── pin.m                  # Pin package
-│   ├── unpin.m                # Unpin package
 │   └── list_loaded.m          # List loaded packages
 └── README.md                  # This file
 ```
