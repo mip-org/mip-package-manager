@@ -358,8 +358,18 @@ function bestVariant = selectBestVariant(variants, currentArch)
     end
 
     if ~isempty(exactMatches)
-        bestVariant = exactMatches{1};
+        bestVariant = selectLatest(exactMatches);
     else
-        bestVariant = compatible{1};
+        bestVariant = selectLatest(compatible);
+    end
+end
+
+function best = selectLatest(variants)
+% Select the variant with the latest version from a list of variants
+    best = variants{1};
+    for i = 2:length(variants)
+        if mip.utils.compare_versions(variants{i}.version, best.version) > 0
+            best = variants{i};
+        end
     end
 end

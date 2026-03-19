@@ -69,8 +69,9 @@ try
         versionMap(version) = [variants, {variant}];
     end
     
-    % Get all versions (sorted)
+    % Get all versions (sorted by version number)
     allVersions = keys(versionMap);
+    allVersions = sortVersions(allVersions);
     
     % Find compatible variant for current architecture (latest version)
     latestVersion = allVersions{end};
@@ -200,4 +201,20 @@ catch ME
     end
 end
 
+end
+
+function sorted = sortVersions(versions)
+% Sort version strings by version number (ascending)
+    n = length(versions);
+    sorted = versions;
+    % Simple insertion sort using compare_versions
+    for i = 2:n
+        key = sorted{i};
+        j = i - 1;
+        while j >= 1 && mip.utils.compare_versions(sorted{j}, key) > 0
+            sorted{j+1} = sorted{j};
+            j = j - 1;
+        end
+        sorted{j+1} = key;
+    end
 end
