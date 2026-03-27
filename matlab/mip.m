@@ -41,9 +41,6 @@ if nargin < 1
     command = 'help';
 end
 
-% Run migration if needed (once after upgrade to namespaced layout)
-mip.utils.migrate_layout();
-
 % Ensure mip itself is always tracked as a loaded sticky package
 mip.utils.key_value_append('MIP_LOADED_PACKAGES', 'mip');
 mip.utils.key_value_append('MIP_STICKY_PACKAGES', 'mip');
