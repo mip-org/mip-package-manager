@@ -1,8 +1,15 @@
 function root = root()
 %ROOT   Get the mip root directory path.
-%   ROOT() returns the path to the mip root directory by determining where
-%   this package is installed. Assumes the layout:
+%   ROOT() returns the path to the mip root directory. If the environment
+%   variable MIP_ROOT is set, that value is used. Otherwise, the root is
+%   determined by navigating up from this file's installed location,
+%   assuming the layout:
 %     <root>/packages/mip-org/core/mip/mip/+mip/root.m
+
+root = getenv('MIP_ROOT');
+if ~isempty(root)
+    return;
+end
 
 % Navigate up from this file's location:
 %   +mip/root -> +mip -> mip (source) -> mip (package) -> core -> mip-org -> packages -> root
@@ -13,5 +20,13 @@ channel_dir = fileparts(package_dir);         % .../mip-org/core
 org_dir = fileparts(channel_dir);             % .../packages/mip-org
 packages_dir = fileparts(org_dir);            % .../packages
 root = fileparts(packages_dir);               % .../root
+
+if ~isfolder(fullfile(root, 'packages'))
+    error('mip:rootNotFound', ...
+        ['Could not determine the mip root directory from the installed location.\n' ...
+         'This usually means mip is not installed in the expected layout.\n' ...
+         'Set the MIP_ROOT environment variable to point to your mip root directory.\n' ...
+         'For example: setenv(''MIP_ROOT'', ''%s/.mip'')'], getenv('HOME'));
+end
 
 end
