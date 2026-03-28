@@ -92,18 +92,22 @@ function count = installFromRepository(repoPackages, packagesDir, channel)
     currentArch = mip.arch();
     fprintf('Detected architecture: %s\n', currentArch);
 
-    % Build package info map for the primary channel
-    [packageInfoMap, unavailablePackages] = mip.utils.build_package_info_map(index);
-
-    % Resolve each package argument to org/channel/name
+    % Resolve each package argument to org/channel/name (with optional version)
     resolvedPackages = {};  % cell array of structs with .org, .channel, .name, .fqn
+    requestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
     for i = 1:length(repoPackages)
         pkg = repoPackages{i};
-        [org, ch, name] = mip.utils.resolve_package_name(pkg, channel);
+        [org, ch, name, version] = mip.utils.resolve_package_name(pkg, channel);
         s = struct('org', org, 'channel', ch, 'name', name, ...
                    'fqn', mip.utils.make_fqn(org, ch, name));
         resolvedPackages{end+1} = s;
+        if ~isempty(version)
+            requestedVersions(name) = version;
+        end
     end
+
+    % Build package info map for the primary channel (with version constraints)
+    [packageInfoMap, unavailablePackages] = mip.utils.build_package_info_map(index, requestedVersions);
 
     % Check if any requested packages are unavailable
     for i = 1:length(resolvedPackages)

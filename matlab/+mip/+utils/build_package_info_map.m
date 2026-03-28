@@ -1,18 +1,26 @@
-function [packageInfoMap, unavailablePackages] = build_package_info_map(index)
+function [packageInfoMap, unavailablePackages] = build_package_info_map(index, requestedVersions)
 %BUILD_PACKAGE_INFO_MAP   Build a map from package name to best variant info.
 %
 % Args:
-%   index - Parsed index struct (from fetch_index)
+%   index             - Parsed index struct (from fetch_index)
+%   requestedVersions - (optional) containers.Map of name -> version string.
+%                       When a version is specified for a package, that version
+%                       is used instead of the automatic best-version selection.
 %
 % Returns:
-%   packageInfoMap - containers.Map: package name -> best variant struct
+%   packageInfoMap      - containers.Map: package name -> best variant struct
 %   unavailablePackages - containers.Map: package name -> cell array of available architectures
+
+if nargin < 2
+    requestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
+end
 
 currentArch = mip.arch();
 packages = index.packages;
 
-% Group packages by name
-packagesByName = containers.Map('KeyType', 'char', 'ValueType', 'any');
+% Group packages by name, then by version
+% nameMap: name -> containers.Map(version -> cell array of variants)
+nameMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
 for i = 1:length(packages)
     if iscell(packages)
         pkg = packages{i};
@@ -25,21 +33,44 @@ for i = 1:length(packages)
     end
 
     pkgName = pkg.name;
-    if ~packagesByName.isKey(pkgName)
-        packagesByName(pkgName) = {};
+    pkgVersion = pkg.version;
+
+    if ~nameMap.isKey(pkgName)
+        nameMap(pkgName) = containers.Map('KeyType', 'char', 'ValueType', 'any');
     end
-    variants = packagesByName(pkgName);
-    packagesByName(pkgName) = [variants, {pkg}];
+    versionMap = nameMap(pkgName);
+
+    if ~versionMap.isKey(pkgVersion)
+        versionMap(pkgVersion) = {};
+    end
+    variants = versionMap(pkgVersion);
+    versionMap(pkgVersion) = [variants, {pkg}];
 end
 
-% Select best variant for each package
+% For each package name, select best version then best variant
 packageInfoMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
 unavailablePackages = containers.Map('KeyType', 'char', 'ValueType', 'any');
 
-packageNames = keys(packagesByName);
+packageNames = keys(nameMap);
 for i = 1:length(packageNames)
     pkgName = packageNames{i};
-    variants = packagesByName(pkgName);
+    versionMap = nameMap(pkgName);
+    allVersions = keys(versionMap);
+
+    % Select version
+    if requestedVersions.isKey(pkgName)
+        chosenVersion = requestedVersions(pkgName);
+        if ~versionMap.isKey(chosenVersion)
+            error('mip:versionNotFound', ...
+                  'Version "%s" not found for package "%s". Available versions: %s', ...
+                  chosenVersion, pkgName, strjoin(allVersions, ', '));
+        end
+    else
+        chosenVersion = mip.utils.select_best_version(allVersions);
+    end
+
+    % Select best variant for the chosen version
+    variants = versionMap(chosenVersion);
     bestVariant = mip.utils.select_best_variant(variants, currentArch);
 
     if ~isempty(bestVariant)

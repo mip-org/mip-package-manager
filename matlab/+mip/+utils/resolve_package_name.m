@@ -1,10 +1,12 @@
-function [org, channelName, name] = resolve_package_name(packageArg, defaultChannel)
-%RESOLVE_PACKAGE_NAME   Resolve a package argument to org/channel/name.
+function [org, channelName, name, version] = resolve_package_name(packageArg, defaultChannel)
+%RESOLVE_PACKAGE_NAME   Resolve a package argument to org/channel/name/version.
 %
 % Handles both fully qualified names and bare names (with channel context).
+% Also extracts an optional @version suffix.
 %
 % Args:
-%   packageArg     - Package string: 'name' or 'org/channel/name'
+%   packageArg     - Package string: 'name', 'name@version',
+%                    'org/channel/name', or 'org/channel/name@version'
 %   defaultChannel - Default channel string (e.g. 'core', 'owner/chan')
 %                    Used when packageArg is a bare name.
 %
@@ -12,6 +14,7 @@ function [org, channelName, name] = resolve_package_name(packageArg, defaultChan
 %   org         - Organization name
 %   channelName - Channel name
 %   name        - Package name
+%   version     - Requested version (empty string if not specified)
 
 if nargin < 2 || isempty(defaultChannel)
     defaultChannel = 'core';
@@ -27,5 +30,7 @@ else
     [org, channelName] = mip.utils.parse_channel_spec(defaultChannel);
     name = result.name;
 end
+
+version = result.version;
 
 end

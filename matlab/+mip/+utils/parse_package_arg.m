@@ -1,10 +1,11 @@
 function result = parse_package_arg(arg)
 %PARSE_PACKAGE_ARG   Parse a package argument into its components.
 %
-% Handles both bare names and fully qualified names (org/channel/package).
+% Handles bare names, fully qualified names, and optional @version suffix.
 %
 % Args:
-%   arg - Package string: 'package_name' or 'org/channel/package_name'
+%   arg - Package string: 'package_name', 'package@version',
+%         'org/channel/package', or 'org/channel/package@version'
 %
 % Returns:
 %   result - Struct with fields:
@@ -12,13 +13,30 @@ function result = parse_package_arg(arg)
 %     .org     - Organization (empty if bare name)
 %     .channel - Channel name (empty if bare name)
 %     .is_fqn  - True if fully qualified
+%     .version - Requested version (empty string if not specified)
 %
 % Examples:
 %   r = parse_package_arg('chebfun')
-%     -> name='chebfun', org='', channel='', is_fqn=false
+%     -> name='chebfun', org='', channel='', is_fqn=false, version=''
+%
+%   r = parse_package_arg('chebfun@1.2.0')
+%     -> name='chebfun', org='', channel='', is_fqn=false, version='1.2.0'
 %
 %   r = parse_package_arg('mip-org/core/chebfun')
-%     -> name='chebfun', org='mip-org', channel='core', is_fqn=true
+%     -> name='chebfun', org='mip-org', channel='core', is_fqn=true, version=''
+%
+%   r = parse_package_arg('mip-org/core/mip@main')
+%     -> name='mip', org='mip-org', channel='core', is_fqn=true, version='main'
+
+% Extract @version suffix if present
+atIdx = strfind(arg, '@');
+if ~isempty(atIdx)
+    lastAt = atIdx(end);
+    requestedVersion = arg(lastAt+1:end);
+    arg = arg(1:lastAt-1);
+else
+    requestedVersion = '';
+end
 
 parts = strsplit(arg, '/');
 
@@ -34,7 +52,9 @@ elseif length(parts) == 3
     result.is_fqn = true;
 else
     error('mip:invalidPackageSpec', ...
-          'Invalid package spec "%s". Use "package" or "org/channel/package".', arg);
+          'Invalid package spec "%s". Use "package[@version]" or "org/channel/package[@version]".', arg);
 end
+
+result.version = requestedVersion;
 
 end
