@@ -275,7 +275,12 @@ function cloneSource(source, srcPath)
 
         fprintf('Cloning source repository...\n');
         fprintf('  %s\n', cmd);
+        % Clear LD_LIBRARY_PATH so git uses system libraries instead of
+        % MATLAB's bundled ones (avoids libcurl/libssh2 symbol conflicts)
+        origLdPath = getenv('LD_LIBRARY_PATH');
+        setenv('LD_LIBRARY_PATH', '');
         [status, output] = system(cmd);
+        setenv('LD_LIBRARY_PATH', origLdPath);
         if status ~= 0
             error('mip:installEditable:cloneFailed', ...
                 'Failed to clone repository:\n%s', output);
