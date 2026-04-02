@@ -3,6 +3,13 @@
 
 # MATLAB
 *.asv
+*.m~
+*.autosave
+*.mex*
+*.p
+slprj/
+codegen/
+octave-workspace
 
 # Python
 __pycache__/
@@ -10,8 +17,7 @@ __pycache__/
 build/
 dist/
 *.egg-info/
-*.spec
-*.dist
 
-# Visual Studio Code
+# IDE
 .vscode/
+.idea/

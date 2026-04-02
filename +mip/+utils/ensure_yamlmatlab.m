@@ -8,11 +8,10 @@ if exist('yaml.ReadYaml', 'file')
     return;
 end
 
-% Navigate from +mip/+utils/ up to the package manager root
+% Navigate from +mip/+utils/ up to the repo root
 thisDir = fileparts(mfilename('fullpath'));   % +mip/+utils
 mipPkgDir = fileparts(thisDir);              % +mip
-matlabDir = fileparts(mipPkgDir);            % matlab
-pmRoot = fileparts(matlabDir);               % mip-package-manager
+pmRoot = fileparts(mipPkgDir);               % repo root
 
 yamlPath = fullfile(pmRoot, 'external', 'yamlmatlab');
 if exist(yamlPath, 'dir')
