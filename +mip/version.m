@@ -1,6 +1,17 @@
 function v = version()
 %VERSION   Return the mip package manager version string.
 
-v = '0.0.1';
+thisDir = fileparts(mfilename('fullpath'));  % +mip directory
+pkgRoot = fileparts(thisDir);  % package root
+mipJsonPath = fullfile(pkgRoot, 'mip.json');
+if ~exist(mipJsonPath, 'file')
+    error('mip:version:noMipJson', ...
+          'mip.json not found at %s. Is mip installed correctly?', pkgRoot);
+end
+pkgInfo = mip.utils.read_package_json(pkgRoot);
+v = pkgInfo.version;
+if isnumeric(v)
+    v = num2str(v);
+end
 
 end
