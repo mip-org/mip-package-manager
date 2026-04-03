@@ -66,8 +66,11 @@ sortedPackages = {};
             deps = dependencies(pkgName);
             for j = 1:length(deps)
                 dep = deps{j};
-                if ismember(dep, packageNames)
-                    visit(dep);
+                % If dependency is FQN, extract bare name for matching
+                depResult = mip.utils.parse_package_arg(dep);
+                depBareName = depResult.name;
+                if ismember(depBareName, packageNames)
+                    visit(depBareName);
                 end
             end
         end

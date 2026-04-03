@@ -40,10 +40,21 @@ if ~isempty(mipConfig.dependencies)
     fprintf('Dependencies: %s\n', strjoin(mipConfig.dependencies, ', '));
     for i = 1:length(mipConfig.dependencies)
         dep = mipConfig.dependencies{i};
-        depFqn = mip.utils.resolve_bare_name(dep);
-        if isempty(depFqn)
-            error('mip:dependencyNotFound', ...
-                  'Dependency "%s" is not installed. Install it first.', dep);
+        depResult = mip.utils.parse_package_arg(dep);
+        if depResult.is_fqn
+            % FQN dependency: must be installed at that exact location
+            depDir = mip.utils.get_package_dir(depResult.org, depResult.channel, depResult.name);
+            if ~exist(depDir, 'dir')
+                error('mip:dependencyNotFound', ...
+                      'Dependency "%s" is not installed. Install it first.', dep);
+            end
+        else
+            % Bare name dependency: any channel satisfies it
+            depFqn = mip.utils.resolve_bare_name(dep);
+            if isempty(depFqn)
+                error('mip:dependencyNotFound', ...
+                      'Dependency "%s" is not installed. Install it first.', dep);
+            end
         end
     end
 end

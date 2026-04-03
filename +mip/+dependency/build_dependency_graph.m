@@ -67,7 +67,10 @@ end
 
 for i = 1:length(dependencies)
     dep = dependencies{i};
-    subDeps = mip.dependency.build_dependency_graph(dep, packageInfoMap, visited, path);
+    % If dependency is specified as FQN, extract bare name for index lookup
+    depResult = mip.utils.parse_package_arg(dep);
+    depName = depResult.name;
+    subDeps = mip.dependency.build_dependency_graph(depName, packageInfoMap, visited, path);
     depList = [depList, subDeps]; %#ok<*AGROW>
 end
 

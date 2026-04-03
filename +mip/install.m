@@ -186,6 +186,12 @@ function count = installFromRepository(repoPackages, packagesDir, channel)
     % Sort topologically
     allPackagesToInstall = mip.dependency.topological_sort(allRequiredNames, packageInfoMap);
 
+    % Build set of requested bare names
+    requestedBareNames = {};
+    for i = 1:length(resolvedPackages)
+        requestedBareNames{end+1} = resolvedPackages{i}.name;
+    end
+
     % Map each bare name to its FQN (all dependencies go to the same channel)
     toInstallFqns = {};
     alreadyInstalled = {};
@@ -197,8 +203,12 @@ function count = installFromRepository(repoPackages, packagesDir, channel)
 
         if exist(pkgDir, 'dir')
             alreadyInstalled{end+1} = fqn;
+        elseif ismember(name, requestedBareNames)
+            % User explicitly requested this package; install it even if
+            % the same name exists on another channel
+            toInstallFqns{end+1} = fqn;
         else
-            % Also check if the dependency is installed from another channel
+            % For dependencies, any channel satisfies the requirement
             existingFqn = mip.utils.resolve_bare_name(name);
             if ~isempty(existingFqn)
                 alreadyInstalled{end+1} = existingFqn;
