@@ -1,8 +1,9 @@
-function load(packageArg, varargin)
-%LOAD   Load a mip package into the MATLAB path.
+function load(varargin)
+%LOAD   Load one or more mip packages into the MATLAB path.
 %
 % Usage:
 %   mip.load('packageName')
+%   mip.load('package1', 'package2', ...)
 %   mip.load('packageName', '--sticky')
 %   mip.load('packageName', '--install')
 %   mip.load('org/channel/packageName')
@@ -13,23 +14,36 @@ function load(packageArg, varargin)
 %   2. First alphabetically by org/channel
 %
 % Options:
-%   --sticky    Mark the package as sticky (prevents unload with 'mip unload --all')
-%   --install   Automatically install the package if it is not already installed
+%   --sticky    Mark the package(s) as sticky (prevents unload with 'mip unload --all')
+%   --install   Automatically install the package(s) if not already installed
 
-    % Parse flags
+    % Parse flags and package names from arguments
     installIfMissing = false;
     stickyPackage = false;
-    remainingArgs = {};
+    packageArgs = {};
     for i = 1:length(varargin)
         arg = varargin{i};
         if ischar(arg) && strcmp(arg, '--install')
             installIfMissing = true;
         elseif ischar(arg) && strcmp(arg, '--sticky')
             stickyPackage = true;
-        else
-            remainingArgs{end+1} = arg; %#ok<*AGROW>
+        elseif ischar(arg) && ~startsWith(arg, '--')
+            packageArgs{end+1} = arg; %#ok<*AGROW>
         end
     end
+
+    if isempty(packageArgs)
+        error('mip:noPackage', 'No package specified for load command.');
+    end
+
+    % Load each package
+    for i = 1:length(packageArgs)
+        loadSingle(packageArgs{i}, installIfMissing, stickyPackage, true, {});
+    end
+end
+
+function loadSingle(packageArg, installIfMissing, stickyPackage, isDirect, loadingStack)
+% Load a single package (and its dependencies recursively).
 
     % Resolve the FQN for this package, installing first if requested
     try
@@ -49,14 +63,6 @@ function load(packageArg, varargin)
         fprintf('Package "mip" is always loaded\n');
         return
     end
-
-    % Parse optional arguments for internal use
-    p = inputParser;
-    addParameter(p, 'loadingStack', {}, @iscell);
-    addParameter(p, 'isDirect', true, @islogical);
-    parse(p, remainingArgs{:});
-    loadingStack = p.Results.loadingStack;
-    isDirect = p.Results.isDirect;
 
     % Check for circular dependencies
     if ismember(fqn, loadingStack)
@@ -121,7 +127,7 @@ function load(packageArg, varargin)
                     % Resolve dependency: same channel first, then core
                     depFqn = resolveDependency(dep, result.org, result.channel);
                     if ~mip.utils.is_loaded(depFqn)
-                        mip.load(depFqn, 'loadingStack', loadingStack, 'isDirect', false);
+                        loadSingle(depFqn, installIfMissing, false, false, loadingStack);
                     else
                         fprintf('  Dependency "%s" is already loaded\n', depFqn);
                     end
