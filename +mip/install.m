@@ -91,31 +91,37 @@ function install(varargin)
     end
 
     % Handle repository packages
-    installedCount = 0;
+    installedFqns = {};
 
     if ~isempty(repoPackages)
-        installedCount = installedCount + installFromRepository(repoPackages, packagesDir, channel);
+        installedFqns = [installedFqns, installFromRepository(repoPackages, packagesDir, channel)];
     end
 
     % Handle .mhl file installations
     for i = 1:length(mhlSources)
-        if installFromMhl(mhlSources{i}, packagesDir, channel)
-            installedCount = installedCount + 1;
+        fqn = installFromMhl(mhlSources{i}, packagesDir, channel);
+        if ~isempty(fqn)
+            installedFqns = [installedFqns, {fqn}];
         end
     end
 
     % Summary
+    installedCount = length(installedFqns);
     if installedCount == 0 && isempty(mhlSources)
         fprintf('\nAll packages already installed.\n');
     elseif installedCount > 0
         fprintf('\nSuccessfully installed %d package(s).\n', installedCount);
+        fprintf('\nTo use installed packages, run:\n');
+        for i = 1:length(installedFqns)
+            fprintf('  mip load %s\n', loadHintName(installedFqns{i}));
+        end
     end
 end
 
-function count = installFromRepository(repoPackages, packagesDir, channel)
+function installedFqns = installFromRepository(repoPackages, ~, channel)
 % Install packages from the mip repository
 
-    count = 0;
+    installedFqns = {};
 
     % Determine effective channel for bare-name packages
     if isempty(channel)
@@ -246,22 +252,36 @@ function count = installFromRepository(repoPackages, packagesDir, channel)
             pkgInfo = packageInfoMap(result.name);
             pkgDir = mip.utils.get_package_dir(result.org, result.channel, result.name);
             downloadAndInstall(fqn, pkgInfo, pkgDir);
-            count = count + 1;
         end
 
-        % Mark requested packages as directly installed (using FQN)
+        % Mark requested packages as directly installed and collect their FQNs
         for i = 1:length(resolvedPackages)
             s = resolvedPackages{i};
             mip.utils.add_directly_installed(s.fqn);
+            if ismember(s.fqn, toInstallFqns)
+                installedFqns{end+1} = s.fqn;
+            end
+        end
+    end
+
+    % Warn if any installed package name exists in multiple channels
+    for i = 1:length(resolvedPackages)
+        s = resolvedPackages{i};
+        allInstalled = mip.utils.find_all_installed_by_name(s.name);
+        if length(allInstalled) > 1
+            fprintf('\nWarning: Package "%s" is installed from multiple channels:\n', s.name);
+            for k = 1:length(allInstalled)
+                fprintf('  - %s\n', allInstalled{k});
+            end
         end
     end
 
 end
 
-function success = installFromMhl(mhlSource, packagesDir, channel)
+function installedFqn = installFromMhl(mhlSource, packagesDir, channel)
 % Install a package from a local .mhl file or URL
 
-    success = false;
+    installedFqn = '';
     tempDir = tempname;
     mkdir(tempDir);
 
@@ -315,7 +335,7 @@ function success = installFromMhl(mhlSource, packagesDir, channel)
         % Mark as directly installed
         mip.utils.add_directly_installed(fqn);
 
-        success = true;
+        installedFqn = fqn;
 
     catch ME
         % Clean up on error
@@ -328,6 +348,24 @@ function success = installFromMhl(mhlSource, packagesDir, channel)
     % Clean up temp directory
     if exist(tempDir, 'dir')
         rmdir(tempDir, 's');
+    end
+end
+
+function name = loadHintName(fqn)
+% Return bare name if unique across installed packages, otherwise FQN.
+    result = mip.utils.parse_package_arg(fqn);
+    allInstalled = mip.utils.list_installed_packages();
+    count = 0;
+    for i = 1:length(allInstalled)
+        r = mip.utils.parse_package_arg(allInstalled{i});
+        if strcmp(r.name, result.name)
+            count = count + 1;
+        end
+    end
+    if count > 1
+        name = fqn;
+    else
+        name = result.name;
     end
 end
 
