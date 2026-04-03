@@ -38,7 +38,7 @@ classdef TestChannelInstall < matlab.unittest.TestCase
 
         function testInstallFromChannel_BareNameWithChannelFlag(testCase)
             % Install a package using --channel flag with bare name
-            mip.install('--channel', 'test-channel1', 'alpha');
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
                 'mip-org', 'test-channel1', 'alpha');
@@ -58,7 +58,7 @@ classdef TestChannelInstall < matlab.unittest.TestCase
 
         function testInstallFromChannel_SpecificVersion(testCase)
             % Install a specific version of a package
-            mip.install('--channel', 'test-channel1', 'alpha@1.0.0');
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
                 'mip-org', 'test-channel1', 'alpha');
@@ -76,7 +76,7 @@ classdef TestChannelInstall < matlab.unittest.TestCase
 
         function testInstallFromChannel_SameChannelDep(testCase)
             % gamma depends on mip-org/test-channel1/alpha (FQN)
-            mip.install('--channel', 'test-channel1', 'gamma');
+            mip.install('--channel', 'mip-org/test-channel1', 'gamma');
 
             gammaDir = fullfile(testCase.TestRoot, 'packages', ...
                 'mip-org', 'test-channel1', 'gamma');
@@ -93,7 +93,7 @@ classdef TestChannelInstall < matlab.unittest.TestCase
 
         function testInstallFromChannel_CrossChannelDep(testCase)
             % cross (test-channel2) depends on mip-org/test-channel1/alpha
-            mip.install('--channel', 'test-channel2', 'cross');
+            mip.install('--channel', 'mip-org/test-channel2', 'cross');
 
             crossDir = fullfile(testCase.TestRoot, 'packages', ...
                 'mip-org', 'test-channel2', 'cross');
@@ -109,7 +109,7 @@ classdef TestChannelInstall < matlab.unittest.TestCase
         function testInstallFromChannel_CrossChannelDepPreInstalled(testCase)
             % Pre-install alpha, then install cross which depends on it
             mip.install('mip-org/test-channel1/alpha');
-            mip.install('--channel', 'test-channel2', 'cross');
+            mip.install('--channel', 'mip-org/test-channel2', 'cross');
 
             crossDir = fullfile(testCase.TestRoot, 'packages', ...
                 'mip-org', 'test-channel2', 'cross');
@@ -121,8 +121,8 @@ classdef TestChannelInstall < matlab.unittest.TestCase
 
         function testInstallFromChannel_SameNameDifferentChannels(testCase)
             % Install shared from both channels
-            mip.install('--channel', 'test-channel1', 'shared');
-            mip.install('--channel', 'test-channel2', 'shared');
+            mip.install('--channel', 'mip-org/test-channel1', 'shared');
+            mip.install('--channel', 'mip-org/test-channel2', 'shared');
 
             dir1 = fullfile(testCase.TestRoot, 'packages', ...
                 'mip-org', 'test-channel1', 'shared');
@@ -139,7 +139,7 @@ classdef TestChannelInstall < matlab.unittest.TestCase
 
         function testInstallFromChannel_BareNameDepToCore(testCase)
             % core_dep depends on 'chebfun' (bare name → mip-org/core)
-            mip.install('--channel', 'test-channel1', 'core_dep');
+            mip.install('--channel', 'mip-org/test-channel1', 'core_dep');
 
             coreDepDir = fullfile(testCase.TestRoot, 'packages', ...
                 'mip-org', 'test-channel1', 'core_dep');
@@ -177,7 +177,7 @@ classdef TestChannelInstall < matlab.unittest.TestCase
 
         function testLoadFromChannel_WithSameChannelDep(testCase)
             % Install gamma (depends on alpha, same channel), then load
-            mip.install('--channel', 'test-channel1', 'gamma');
+            mip.install('--channel', 'mip-org/test-channel1', 'gamma');
             mip.load('mip-org/test-channel1/gamma');
 
             testCase.verifyTrue(mip.utils.is_loaded('mip-org/test-channel1/gamma'), ...
@@ -190,8 +190,8 @@ classdef TestChannelInstall < matlab.unittest.TestCase
 
         function testLoadFromChannel_DisambiguateByFQN(testCase)
             % Install shared from both channels, load specific one
-            mip.install('--channel', 'test-channel1', 'shared');
-            mip.install('--channel', 'test-channel2', 'shared');
+            mip.install('--channel', 'mip-org/test-channel1', 'shared');
+            mip.install('--channel', 'mip-org/test-channel2', 'shared');
 
             mip.load('mip-org/test-channel1/shared');
 

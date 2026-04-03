@@ -14,8 +14,8 @@ function install(varargin)
 %   mip.install('-e', '/path/to/package')           - Editable install (short form)
 %
 % Options:
-%   --channel <name>    Install from a specific channel (default: core)
-%                       Accepts 'core', 'dev', or 'owner/channel'
+%   --channel <name>    Install from a specific channel (default: mip-org/core)
+%                       Format: 'org/channel' (e.g. 'mip-org/core')
 %   --editable, -e      Install in editable mode (local packages only)
 %
 % Local packages:
@@ -125,7 +125,7 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
 
     % Determine effective channel for bare-name packages
     if isempty(channel)
-        channel = 'core';
+        channel = 'mip-org/core';
     end
 
     [defaultOrg, defaultChan] = mip.utils.parse_channel_spec(channel);
@@ -164,7 +164,7 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
         % Non-core channel: also fetch core index for dependency resolution
         % (bare-name dependencies always resolve to mip-org/core)
         fprintf('Fetching core package index for dependency resolution...\n');
-        coreIndex = mip.utils.fetch_index('core');
+        coreIndex = mip.utils.fetch_index('mip-org/core');
         [packageInfoMap, unavailablePackages] = mip.utils.build_package_info_map(coreIndex, 'mip-org', 'core');
 
         % Add channel packages (version constraints only apply to these)
@@ -291,7 +291,7 @@ function installedFqn = installFromMhl(mhlSource, packagesDir, channel)
     mkdir(tempDir);
 
     if isempty(channel)
-        channel = 'core';
+        channel = 'mip-org/core';
     end
     [org, channelName] = mip.utils.parse_channel_spec(channel);
 
