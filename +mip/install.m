@@ -192,12 +192,6 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
     % Sort topologically
     allPackagesToInstall = mip.dependency.topological_sort(allRequiredFqns, packageInfoMap);
 
-    % Build set of requested FQNs
-    requestedFqns = {};
-    for i = 1:length(resolvedPackages)
-        requestedFqns{end+1} = resolvedPackages{i}.fqn;
-    end
-
     % Determine which packages need installing vs already installed
     toInstallFqns = {};
     alreadyInstalled = {};
@@ -209,18 +203,8 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
 
         if exist(pkgDir, 'dir')
             alreadyInstalled{end+1} = fqn;
-        elseif ismember(fqn, requestedFqns)
-            % User explicitly requested this package; install it even if
-            % the same name exists on another channel
-            toInstallFqns{end+1} = fqn;
         else
-            % For dependencies, any channel satisfies the requirement
-            existingFqn = mip.utils.resolve_bare_name(result.name);
-            if ~isempty(existingFqn)
-                alreadyInstalled{end+1} = existingFqn;
-            else
-                toInstallFqns{end+1} = fqn;
-            end
+            toInstallFqns{end+1} = fqn;
         end
     end
 
