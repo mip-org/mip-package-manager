@@ -4,14 +4,14 @@ function v = version()
 thisDir = fileparts(mfilename('fullpath'));  % +mip directory
 pkgRoot = fileparts(thisDir);  % package root
 mipJsonPath = fullfile(pkgRoot, 'mip.json');
-if exist(mipJsonPath, 'file')
-    pkgInfo = mip.utils.read_package_json(pkgRoot);
-    v = pkgInfo.version;
-    if isnumeric(v)
-        v = num2str(v);
-    end
-else
-    v = 'dev';
+if ~exist(mipJsonPath, 'file')
+    error('mip:version:noMipJson', ...
+          'mip.json not found at %s. Is mip installed correctly?', pkgRoot);
+end
+pkgInfo = mip.utils.read_package_json(pkgRoot);
+v = pkgInfo.version;
+if isnumeric(v)
+    v = num2str(v);
 end
 
 end
