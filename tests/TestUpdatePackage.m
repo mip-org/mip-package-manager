@@ -46,7 +46,7 @@ classdef TestUpdatePackage < matlab.unittest.TestCase
 
         %% --- Error cases ---
 
-        function testUpdateNotInstalled_ErrorsBareNam(testCase)
+        function testUpdateNotInstalled_ErrorsBareName(testCase)
             testCase.verifyError(@() mip.update('nonexistent'), ...
                 'mip:update:notInstalled');
         end
