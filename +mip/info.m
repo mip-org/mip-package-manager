@@ -39,8 +39,6 @@ end
 
 [org, channelName, packageName] = mip.utils.resolve_package_name(packageArg, channel);
 
-% ---- Section 1: Local installation(s) ----
-
 % Find all local installations of this package
 result = mip.utils.parse_package_arg(packageArg);
 if result.is_fqn
