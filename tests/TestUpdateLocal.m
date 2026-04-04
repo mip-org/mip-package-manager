@@ -1,5 +1,5 @@
-classdef TestUpdatePackage < matlab.unittest.TestCase
-%TESTUPDATEPACKAGE   Tests for mip.update mechanics.
+classdef TestUpdateLocal < matlab.unittest.TestCase
+%TESTUPDATELOCAL   Tests for mip.update mechanics.
 %
 %   These tests verify the update flow without requiring network access.
 %   They test:
@@ -56,36 +56,12 @@ classdef TestUpdatePackage < matlab.unittest.TestCase
                 'mip:update:notInstalled');
         end
 
-        %% --- Local package: source_path stored ---
-
-        function testCopyInstall_StoresSourcePath(testCase)
-            srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
-            mip.utils.install_local(srcDir, false);
-
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
-            info = mip.utils.read_package_json(pkgDir);
-            testCase.verifyTrue(isfield(info, 'source_path'), ...
-                'Non-editable local install should store source_path in mip.json');
-            testCase.verifyTrue(contains(info.source_path, testCase.SourceDir), ...
-                'source_path should point to original source directory');
-        end
-
-        function testEditableInstall_StoresSourcePath(testCase)
-            srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
-            mip.utils.install_local(srcDir, true);
-
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
-            info = mip.utils.read_package_json(pkgDir);
-            testCase.verifyTrue(isfield(info, 'source_path'));
-            testCase.verifyTrue(contains(info.source_path, testCase.SourceDir));
-        end
-
         %% --- Local package update always reinstalls ---
 
         function testUpdateLocalPackage_AlwaysReinstalls(testCase)
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg', ...
                 'version', '1.0.0');
-            mip.utils.install_local(srcDir, false);
+            mip.install(srcDir);
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
             info1 = mip.utils.read_package_json(pkgDir);
@@ -106,7 +82,7 @@ classdef TestUpdatePackage < matlab.unittest.TestCase
 
         function testUpdateLocalPackage_EditableReinstalls(testCase)
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
-            mip.utils.install_local(srcDir, true);
+            mip.install('-e', srcDir);
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
             info1 = mip.utils.read_package_json(pkgDir);
@@ -126,7 +102,7 @@ classdef TestUpdatePackage < matlab.unittest.TestCase
 
         function testUpdateLocalPackage_PreservesLoadState(testCase)
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
-            mip.utils.install_local(srcDir, false);
+            mip.install(srcDir);
 
             % Load the package
             mip.load('local/local/mypkg');
@@ -142,7 +118,7 @@ classdef TestUpdatePackage < matlab.unittest.TestCase
 
         function testUpdateLocalPackage_UnloadedStaysUnloaded(testCase)
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
-            mip.utils.install_local(srcDir, false);
+            mip.install(srcDir);
 
             % Don't load — just update
             testCase.verifyFalse(mip.utils.is_loaded('local/local/mypkg'));
@@ -157,7 +133,7 @@ classdef TestUpdatePackage < matlab.unittest.TestCase
 
         function testUpdateLocalPackage_MissingSourceErrors(testCase)
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
-            mip.utils.install_local(srcDir, false);
+            mip.install(srcDir);
 
             % Remove the source directory
             rmdir(srcDir, 's');
@@ -179,7 +155,7 @@ classdef TestUpdatePackage < matlab.unittest.TestCase
 
         function testUpdateLocalPackage_BareNameResolution(testCase)
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
-            mip.utils.install_local(srcDir, false);
+            mip.install(srcDir);
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
             info1 = mip.utils.read_package_json(pkgDir);
@@ -198,7 +174,7 @@ classdef TestUpdatePackage < matlab.unittest.TestCase
 
         function testUpdateLocalPackage_PreservesDirectlyInstalled(testCase)
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
-            mip.utils.install_local(srcDir, false);
+            mip.install(srcDir);
 
             testCase.verifyTrue(ismember('local/local/mypkg', ...
                 mip.utils.get_directly_installed()));
