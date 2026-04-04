@@ -77,6 +77,10 @@ if isfield(opts, 'editable') && opts.editable
     mipData.editable = true;
 end
 
+if isfield(opts, 'compile_script') && ~isempty(opts.compile_script)
+    mipData.compile_script = opts.compile_script;
+end
+
 jsonText = jsonencode(mipData);
 mipJsonPath = fullfile(outputDir, 'mip.json');
 fid = fopen(mipJsonPath, 'w');

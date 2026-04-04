@@ -12,11 +12,13 @@ function install(varargin)
 %   mip.install('/path/to/local/package')          - Install from local directory
 %   mip.install('.', '--editable')                  - Editable install (like pip -e)
 %   mip.install('-e', '/path/to/package')           - Editable install (short form)
+%   mip.install('-e', '.', '--no-compile')          - Editable install, skip compilation
 %
 % Options:
 %   --channel <name>    Install from a specific channel (default: mip-org/core)
 %                       Format: 'org/channel' (e.g. 'mip-org/core')
 %   --editable, -e      Install in editable mode (local packages only)
+%   --no-compile        Skip compilation (editable installs only)
 %
 % Local packages:
 %   If the argument is a directory path containing a mip.yaml file,
@@ -30,16 +32,24 @@ function install(varargin)
         error('mip:install:noPackage', 'At least one package name is required for install command.');
     end
 
-    % Check for --editable / -e flag
+    % Check for --editable / -e and --no-compile flags
     editable = false;
+    noCompile = false;
     filteredArgs = {};
     for i = 1:length(varargin)
         arg = varargin{i};
         if ischar(arg) && (strcmp(arg, '--editable') || strcmp(arg, '-e'))
             editable = true;
+        elseif ischar(arg) && strcmp(arg, '--no-compile')
+            noCompile = true;
         else
             filteredArgs{end+1} = arg;
         end
+    end
+
+    if noCompile && ~editable
+        error('mip:install:noCompileRequiresEditable', ...
+              '--no-compile can only be used with --editable local installs.');
     end
 
     [channel, args] = mip.utils.parse_channel_flag(filteredArgs);
@@ -55,7 +65,7 @@ function install(varargin)
         if isfolder(pkg)
             mipYamlPath = fullfile(pkg, 'mip.yaml');
             if isfile(mipYamlPath)
-                mip.utils.install_local(pkg, editable);
+                mip.utils.install_local(pkg, editable, noCompile);
                 return;
             else
                 error('mip:install:noMipYaml', ...

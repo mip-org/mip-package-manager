@@ -1,12 +1,16 @@
-function install_local(sourceDir, editable)
+function install_local(sourceDir, editable, noCompile)
 %INSTALL_LOCAL   Install a package from a local directory with mip.yaml.
 %
 % Args:
 %   sourceDir - Path to the directory containing mip.yaml
-%   editable  - If true, create an editable install (no copy, no compile)
+%   editable  - If true, create an editable install (no copy)
+%   noCompile - If true, skip compilation (editable installs only)
 
 if nargin < 2
     editable = false;
+end
+if nargin < 3
+    noCompile = false;
 end
 
 % Resolve to absolute path
@@ -55,7 +59,7 @@ if ~isempty(mipConfig.dependencies)
 end
 
 if editable
-    installEditable(sourceDir, mipConfig, pkgDir, fqn);
+    installEditable(sourceDir, mipConfig, pkgDir, fqn, noCompile);
 else
     installCopy(sourceDir, pkgDir, fqn);
 end
@@ -94,6 +98,8 @@ end
 
 function installCopy(sourceDir, pkgDir, fqn)
 % Non-editable install: prepare in temp dir, then move into place.
+% This strips MEX binaries and compiles for the current architecture,
+% matching the behavior of channel builds.
 
     stagingDir = tempname;
 
@@ -125,9 +131,12 @@ function installCopy(sourceDir, pkgDir, fqn)
         fprintf('Install complete.\n');
 
     catch ME
-        % Clean up staging dir on failure
+        % Clean up on failure (stagingDir if before movefile, pkgDir if after)
         if exist(stagingDir, 'dir')
             rmdir(stagingDir, 's');
+        end
+        if exist(pkgDir, 'dir')
+            rmdir(pkgDir, 's');
         end
         rethrow(ME);
     end
@@ -135,11 +144,10 @@ function installCopy(sourceDir, pkgDir, fqn)
 end
 
 
-function installEditable(sourceDir, mipConfig, pkgDir, fqn)
+function installEditable(sourceDir, mipConfig, pkgDir, fqn, noCompile)
 % Editable install: create thin wrapper pointing to original source.
-% Unlike installCopy, this intentionally skips prepare_package (and
-% therefore skips MEX binary stripping and compilation) because the
-% install references the user's source directory directly.
+% Unlike installCopy, this does NOT strip MEX binaries or copy files.
+% It DOES compile by default (unless --no-compile is used).
 
     fprintf('Installing "%s" in editable mode...\n', fqn);
 
@@ -172,18 +180,33 @@ function installEditable(sourceDir, mipConfig, pkgDir, fqn)
     mip.build.create_load_script(pkgDir, absolutePaths, scriptOpts);
     mip.build.create_unload_script(pkgDir, absolutePaths, scriptOpts);
 
-    % Create mip.json
+    % Determine compile_script
+    compileScript = '';
+    if isfield(resolvedConfig, 'compile_script') && ~isempty(resolvedConfig.compile_script)
+        compileScript = resolvedConfig.compile_script;
+    end
+
+    % Create mip.json (include compile_script for mip compile)
     jsonOpts = struct('editable', true, 'source_path', sourceDir);
+    if ~isempty(compileScript)
+        jsonOpts.compile_script = compileScript;
+    end
     mip.build.create_mip_json(pkgDir, mipConfig, resolvedConfig, effectiveArch, jsonOpts);
 
     fprintf('Editable install complete. Changes in %s will be reflected immediately.\n', sourceDir);
 
-    % Print compile hint if a compile script is specified
-    if isfield(resolvedConfig, 'compile_script') && ...
-            ~isempty(resolvedConfig.compile_script)
-        fprintf('\nNote: This is an editable install. No compilation was performed.\n');
-        fprintf('To compile, run in MATLAB:\n');
-        fprintf('  cd(''%s''); run(''%s'');\n', sourceDir, resolvedConfig.compile_script);
+    % Compile unless --no-compile was specified
+    if ~isempty(compileScript)
+        if noCompile
+            fprintf('\nCompilation skipped (--no-compile).\n');
+            fprintf('To compile later, run:\n');
+            fprintf('  mip compile %s\n', mipConfig.name);
+        else
+            fprintf('\nCompiling...\n');
+            mip.build.run_compile(sourceDir, compileScript);
+            fprintf('\nIf you edit files that require recompilation, run:\n');
+            fprintf('  mip compile %s\n', mipConfig.name);
+        end
     end
 
 end

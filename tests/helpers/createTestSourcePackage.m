@@ -18,6 +18,7 @@ function srcDir = createTestSourcePackage(baseDir, pkgName, varargin)
 p = inputParser;
 addParameter(p, 'version', '1.0.0', @ischar);
 addParameter(p, 'dependencies', {}, @iscell);
+addParameter(p, 'compile_script', '', @ischar);
 parse(p, varargin{:});
 
 srcDir = fullfile(baseDir, pkgName);
@@ -36,12 +37,32 @@ if ~isempty(deps)
 end
 fprintf(fid, ']\n');
 fprintf(fid, '\n');
+compileScript = p.Results.compile_script;
+if ~isempty(compileScript)
+    fprintf(fid, 'compile_script: "%s"\n', compileScript);
+    fprintf(fid, '\n');
+end
 fprintf(fid, 'addpaths:\n');
 fprintf(fid, '  - path: "."\n');
 fprintf(fid, '\n');
 fprintf(fid, 'builds:\n');
 fprintf(fid, '  - architectures: [any]\n');
 fclose(fid);
+
+% Create compile script if specified
+if ~isempty(compileScript)
+    compilePath = fullfile(srcDir, compileScript);
+    compileParent = fileparts(compilePath);
+    if ~exist(compileParent, 'dir') && ~isempty(compileParent)
+        mkdir(compileParent);
+    end
+    fid2 = fopen(compilePath, 'w');
+    fprintf(fid2, '%% Test compile script for %s\n', pkgName);
+    fprintf(fid2, 'fid = fopen(fullfile(fileparts(mfilename(''fullpath'')), ''.compiled''), ''w'');\n');
+    fprintf(fid2, 'fwrite(fid, ''compiled'');\n');
+    fprintf(fid2, 'fclose(fid);\n');
+    fclose(fid2);
+end
 
 % Create a simple MATLAB function
 fid = fopen(fullfile(srcDir, [pkgName '.m']), 'w');
