@@ -10,9 +10,12 @@ function info(varargin)
 % Options:
 %   --channel <name>  Query a specific channel (default: mip-org/core)
 %
-% Displays detailed information about a package from the repository,
-% including all available versions, installation status, loaded status,
-% dependencies.
+% Shows two kinds of information:
+%   1. Local installation(s) — version, path, loaded/sticky status, deps
+%   2. Remote channel info — available versions and architectures
+%
+% If the package is installed from a channel other than the one being
+% queried, that channel's remote index is also fetched and displayed.
 
 if nargin < 1
     error('mip:noPackage', 'Package name is required');
@@ -35,50 +38,205 @@ if isempty(channel)
 end
 
 [org, channelName, packageName] = mip.utils.resolve_package_name(packageArg, channel);
-fqn = mip.utils.make_fqn(org, channelName, packageName);
 
-% Reconstruct channel string for index lookup
-if strcmp(org, 'mip-org')
-    channelStr = channelName;
+% Find all local installations of this package
+result = mip.utils.parse_package_arg(packageArg);
+if result.is_fqn
+    % FQN: only check that specific installation
+    pkgDir = mip.utils.get_package_dir(org, channelName, packageName);
+    if exist(pkgDir, 'dir')
+        installedFqns = {mip.utils.make_fqn(org, channelName, packageName)};
+    else
+        installedFqns = {};
+    end
 else
-    channelStr = [org '/' channelName];
+    % Bare name: find all installations across channels
+    installedFqns = mip.utils.find_all_installed_by_name(packageName);
 end
 
-try
-    indexUrl = mip.index(channelStr);
-    fprintf('Using channel: %s/%s\n', org, channelName);
-    tempFile = [tempname, '.json'];
-    websave(tempFile, indexUrl, weboptions('Timeout', 60));
-    indexJson = fileread(tempFile);
-    delete(tempFile);
+% ---- Collect channels to query ----
 
-    index = jsondecode(indexJson);
+channelsToQuery = {[org '/' channelName]};
+for i = 1:length(installedFqns)
+    r = mip.utils.parse_package_arg(installedFqns{i});
+    ch = [r.org '/' r.channel];
+    % Skip local/local — no remote index for local installs
+    if strcmp(ch, 'local/local')
+        continue
+    end
+    if ~ismember(ch, channelsToQuery)
+        channelsToQuery{end+1} = ch; %#ok<AGROW>
+    end
+end
 
-    % Get current architecture
-    currentArch = mip.arch();
+% ---- Pre-fetch remote indexes ----
 
-    % Find all variants of this package in the repository
+remoteIndexes = cell(size(channelsToQuery));
+for i = 1:length(channelsToQuery)
+    remoteIndexes{i} = fetchRemoteIndex(channelsToQuery{i});
+end
+
+% Check if package exists in any remote channel
+foundRemote = false;
+for i = 1:length(remoteIndexes)
+    if ~isempty(remoteIndexes{i}) && packageInIndex(remoteIndexes{i}, packageName)
+        foundRemote = true;
+        break
+    end
+end
+
+% If the package is not installed locally and not in any remote channel,
+% error before printing anything.
+if isempty(installedFqns) && ~foundRemote
+    error('mip:unknownPackage', ...
+        'Unknown package "%s" in channel "%s".', ...
+        packageName, strjoin(channelsToQuery, '", "'));
+end
+
+% ---- Section 1: Local installation(s) ----
+
+fprintf('\n');
+
+if ~isempty(installedFqns)
+    fprintf('=== Local Installation(s) ===\n');
+    for i = 1:length(installedFqns)
+        fqn = installedFqns{i};
+        showLocalInstallInfo(fqn);
+    end
+else
+    fprintf('=== Local Installation(s) ===\n');
+    fprintf('\n  Not installed.\n\n');
+end
+
+% ---- Section 2: Remote channel info ----
+
+for i = 1:length(channelsToQuery)
+    showRemoteChannelInfo(channelsToQuery{i}, packageName, remoteIndexes{i});
+end
+
+end
+
+
+function showLocalInstallInfo(fqn)
+% Display info about a single local installation.
+
+    r = mip.utils.parse_package_arg(fqn);
+    pkgDir = mip.utils.get_package_dir(r.org, r.channel, r.name);
+
+    fprintf('\n  %s\n', fqn);
+
+    try
+        pkgInfo = mip.utils.read_package_json(pkgDir);
+    catch
+        fprintf('    (could not read mip.json)\n\n');
+        return
+    end
+
+    if isfield(pkgInfo, 'version')
+        fprintf('    Version: %s\n', pkgInfo.version);
+    end
+
+    fprintf('    Path: %s\n', pkgDir);
+
+    % Loaded / sticky status
+    isLoaded = mip.utils.is_loaded(fqn);
+    isSticky = mip.utils.is_sticky(fqn);
+    if isLoaded && isSticky
+        fprintf('    Loaded: Yes (sticky)\n');
+    elseif isLoaded
+        fprintf('    Loaded: Yes\n');
+    else
+        fprintf('    Loaded: No\n');
+    end
+
+    % Editable
+    if isfield(pkgInfo, 'editable') && pkgInfo.editable
+        fprintf('    Editable: Yes\n');
+        if isfield(pkgInfo, 'source_path')
+            fprintf('    Source: %s\n', pkgInfo.source_path);
+        end
+    end
+
+    % Dependencies
+    if isfield(pkgInfo, 'dependencies') && ~isempty(pkgInfo.dependencies)
+        deps = pkgInfo.dependencies;
+        if ~iscell(deps)
+            deps = {deps};
+        end
+        fprintf('    Dependencies: %s\n', strjoin(deps, ', '));
+    else
+        fprintf('    Dependencies: None\n');
+    end
+
+    fprintf('\n');
+end
+
+
+function index = fetchRemoteIndex(channelStr)
+% Fetch the remote index for a channel. Returns [] on failure.
+    try
+        indexUrl = mip.index(channelStr);
+        tempFile = [tempname, '.json'];
+        websave(tempFile, indexUrl, weboptions('Timeout', 60));
+        indexJson = fileread(tempFile);
+        delete(tempFile);
+        index = jsondecode(indexJson);
+    catch
+        index = [];
+    end
+end
+
+
+function found = packageInIndex(index, packageName)
+% Check if a package exists in a pre-fetched index.
+    found = false;
     packages = index.packages;
-    packageVariants = {};
-
     for i = 1:length(packages)
         if iscell(packages)
             pkg = packages{i};
         else
             pkg = packages(i);
         end
-
         if isstruct(pkg) && strcmp(pkg.name, packageName)
-            packageVariants = [packageVariants, {pkg}]; %#ok<*AGROW>
+            found = true;
+            return
+        end
+    end
+end
+
+
+function showRemoteChannelInfo(channelStr, packageName, index)
+% Display remote channel info for a package using a pre-fetched index.
+
+    [chOrg, chName] = mip.utils.parse_channel_spec(channelStr);
+
+    fprintf('=== Remote Channel: %s/%s ===\n\n', chOrg, chName);
+
+    if isempty(index)
+        fprintf('  Could not fetch index.\n\n');
+        return
+    end
+
+    % Find all variants of this package
+    packages = index.packages;
+    packageVariants = {};
+    for i = 1:length(packages)
+        if iscell(packages)
+            pkg = packages{i};
+        else
+            pkg = packages(i);
+        end
+        if isstruct(pkg) && strcmp(pkg.name, packageName)
+            packageVariants = [packageVariants, {pkg}]; %#ok<AGROW>
         end
     end
 
     if isempty(packageVariants)
-        error('mip:packageNotFound', ...
-              'Package "%s" not found in repository', packageName);
+        fprintf('  Package "%s" not found in this channel.\n\n', packageName);
+        return
     end
 
-    % Group variants by version
+    % Group by version
     versionMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
     for i = 1:length(packageVariants)
         variant = packageVariants{i};
@@ -90,13 +248,23 @@ try
         versionMap(version) = [variants, {variant}];
     end
 
-    % Get all versions (sorted by version number)
-    allVersions = keys(versionMap);
-    allVersions = sortVersions(allVersions);
+    allVersions = sortVersions(keys(versionMap));
 
-    % Find compatible variant for current architecture (latest version)
+    fprintf('  Available Versions:\n');
+    for i = 1:length(allVersions)
+        version = allVersions{i};
+        variants = versionMap(version);
+        archs = {};
+        for j = 1:length(variants)
+            archs = [archs, {variants{j}.architecture}]; %#ok<AGROW>
+        end
+        fprintf('    - %s (%s)\n', version, strjoin(archs, ', '));
+    end
+
+    % Show dependencies from latest compatible variant
     latestVersion = allVersions{end};
     latestVariants = versionMap(latestVersion);
+    currentArch = mip.arch();
     compatibleVariant = [];
 
     canFallbackToWasm = startsWith(currentArch, 'numbl_') && ~strcmp(currentArch, 'numbl_wasm');
@@ -118,98 +286,20 @@ try
         end
     end
 
-    % Check if package is installed (namespaced directory)
-    pkgDir = mip.utils.get_package_dir(org, channelName, packageName);
-    isInstalled = exist(pkgDir, 'dir');
-
-    installedVersion = '';
-    installedInfo = [];
-    if isInstalled
-        installedInfo = mip.utils.read_package_json(pkgDir);
-        if isfield(installedInfo, 'version')
-            installedVersion = installedInfo.version;
-        end
-    end
-
-    % Check if package is loaded
-    isLoaded = mip.utils.is_loaded(fqn);
-    isSticky = mip.utils.is_sticky(fqn);
-
-    % Display package information
-    fprintf('\n');
-    fprintf('=== Package Information ===\n\n');
-    fprintf('Name: %s\n', fqn);
-
-    % Show available versions
-    fprintf('\nAvailable Versions:\n');
-    for i = 1:length(allVersions)
-        version = allVersions{i};
-        variants = versionMap(version);
-
-        archs = {};
-        for j = 1:length(variants)
-            archs = [archs, {variants{j}.architecture}];
-        end
-
-        fprintf('  - %s (%s)\n', version, strjoin(archs, ', '));
-    end
-
-    % Show installation status
-    fprintf('\n');
-    if isInstalled
-        fprintf('Installed: Yes (version %s)\n', installedVersion);
-        fprintf('Installation Path: %s\n', pkgDir);
-    else
-        fprintf('Installed: No\n');
-    end
-
-    % Show loaded status
-    if isLoaded
-        if isSticky
-            fprintf('Loaded: Yes (sticky)\n');
-        else
-            fprintf('Loaded: Yes\n');
-        end
-    else
-        fprintf('Loaded: No\n');
-    end
-
-    % Show dependencies
-    fprintf('\n');
-    if isInstalled && isfield(installedInfo, 'dependencies') && ~isempty(installedInfo.dependencies)
-        fprintf('Dependencies (installed version):\n');
-        deps = installedInfo.dependencies;
-        if ~iscell(deps)
-            deps = {deps};
-        end
-        for i = 1:length(deps)
-            fprintf('  - %s\n', deps{i});
-        end
-    elseif ~isempty(compatibleVariant) && isfield(compatibleVariant, 'dependencies') && ~isempty(compatibleVariant.dependencies)
-        fprintf('Dependencies (latest version):\n');
+    if ~isempty(compatibleVariant) && isfield(compatibleVariant, 'dependencies') && ~isempty(compatibleVariant.dependencies)
         deps = compatibleVariant.dependencies;
         if ~iscell(deps)
             deps = {deps};
         end
+        fprintf('\n  Dependencies (latest):\n');
         for i = 1:length(deps)
-            fprintf('  - %s\n', deps{i});
+            fprintf('    - %s\n', deps{i});
         end
-    else
-        fprintf('Dependencies: None\n');
     end
 
     fprintf('\n');
-
-catch ME
-    if strcmp(ME.identifier, 'mip:packageNotFound')
-        rethrow(ME);
-    else
-        error('mip:infoFailed', ...
-              'Failed to retrieve package information: %s', ME.message);
-    end
 end
 
-end
 
 function sorted = sortVersions(versions)
     n = length(versions);
