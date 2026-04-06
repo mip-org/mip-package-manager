@@ -55,14 +55,10 @@ pkgInfo = mip.utils.read_package_json(pkgDir);
 compileScript = '';
 compileDir = '';
 
+isEditable = isfield(pkgInfo, 'editable') && pkgInfo.editable;
+
 if isfield(pkgInfo, 'compile_script') && ~isempty(pkgInfo.compile_script)
-    % compile_script stored in mip.json (editable installs)
     compileScript = pkgInfo.compile_script;
-    if isfield(pkgInfo, 'source_path') && ~isempty(pkgInfo.source_path)
-        compileDir = pkgInfo.source_path;
-    else
-        compileDir = pkgDir;
-    end
 else
     % Try reading compile_script from mip.yaml in source or package dir
     yamlSearchDir = pkgDir;
@@ -80,9 +76,15 @@ else
             compileScript = resolvedConfig.compile_script;
         end
     end
+end
 
-    % Non-editable installs compile in the package subdirectory
-    % (prepare_package copies source into pkgDir/<package_name>/)
+% Editable installs compile in the source directory;
+% non-editable installs compile in the package subdirectory
+if isEditable && isfield(pkgInfo, 'source_path') && ~isempty(pkgInfo.source_path)
+    compileDir = pkgInfo.source_path;
+elseif isEditable
+    compileDir = pkgDir;
+else
     compileDir = fullfile(pkgDir, pkgInfo.name);
 end
 
