@@ -153,5 +153,70 @@ classdef TestUninstallPackage < matlab.unittest.TestCase
             testCase.verifyTrue(result.is_fqn);
         end
 
+        %% --- prune_unused_packages utility (issue #100) ---
+
+        function testPruneRemovesOrphans(testCase)
+            % A package that is on disk but not in directly_installed.txt
+            % and not a dep of anything directly installed should be pruned.
+            orphanDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'orphan');
+
+            mip.utils.prune_unused_packages();
+
+            testCase.verifyFalse(exist(orphanDir, 'dir') > 0, ...
+                'Orphan should be pruned');
+        end
+
+        function testPrunePreservesDirectlyInstalled(testCase)
+            % A directly-installed package should never be pruned, even
+            % if nothing else references it.
+            keepDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'keep');
+            mip.utils.add_directly_installed('mip-org/core/keep');
+
+            mip.utils.prune_unused_packages();
+
+            testCase.verifyTrue(exist(keepDir, 'dir') > 0, ...
+                'Directly-installed package should be preserved');
+        end
+
+        function testPrunePreservesTransitiveDeps(testCase)
+            % A package reachable from a directly-installed package via
+            % its mip.json dependencies should be preserved.
+            parentDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'parent', ...
+                'dependencies', {'child'});
+            childDir  = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'child');
+            mip.utils.add_directly_installed('mip-org/core/parent');
+
+            mip.utils.prune_unused_packages();
+
+            testCase.verifyTrue(exist(parentDir, 'dir') > 0, ...
+                'Directly-installed parent should be preserved');
+            testCase.verifyTrue(exist(childDir, 'dir') > 0, ...
+                'Bare-name dep of directly-installed parent should be preserved');
+        end
+
+        function testPruneRemovesOrphanAlongsideDirectlyInstalled(testCase)
+            % Mixed state: a directly-installed package coexists with an
+            % orphan. Only the orphan is removed.
+            keepDir   = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'keep');
+            orphanDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'orphan');
+            mip.utils.add_directly_installed('mip-org/core/keep');
+
+            mip.utils.prune_unused_packages();
+
+            testCase.verifyTrue(exist(keepDir, 'dir') > 0);
+            testCase.verifyFalse(exist(orphanDir, 'dir') > 0);
+        end
+
+        function testPruneNeverRemovesMipItself(testCase)
+            % mip-org/core/mip is the package manager and must be exempt
+            % from pruning even when it isn't in directly_installed.txt.
+            mipDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'mip');
+
+            mip.utils.prune_unused_packages();
+
+            testCase.verifyTrue(exist(mipDir, 'dir') > 0, ...
+                'mip-org/core/mip must never be pruned');
+        end
+
     end
 end

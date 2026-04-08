@@ -288,13 +288,27 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
         end
         fprintf('\n');
 
-        % Install each package
-        for i = 1:length(toInstallFqns)
-            fqn = toInstallFqns{i};
-            pkgInfo = packageInfoMap(fqn);
-            result = mip.utils.parse_package_arg(fqn);
-            pkgDir = mip.utils.get_package_dir(result.org, result.channel, result.name);
-            downloadAndInstall(fqn, pkgInfo, pkgDir);
+        % Install each package. If any package fails midway, the
+        % already-installed-during-this-call dependencies are still on disk
+        % but not in directly_installed.txt -- prune them so a failed
+        % install doesn't leave orphans behind.
+        try
+            for i = 1:length(toInstallFqns)
+                fqn = toInstallFqns{i};
+                pkgInfo = packageInfoMap(fqn);
+                result = mip.utils.parse_package_arg(fqn);
+                pkgDir = mip.utils.get_package_dir(result.org, result.channel, result.name);
+                downloadAndInstall(fqn, pkgInfo, pkgDir);
+            end
+        catch ME
+            fprintf('\nInstall failed; rolling back any orphaned dependencies...\n');
+            try
+                mip.utils.prune_unused_packages();
+            catch pruneErr
+                warning('mip:rollbackFailed', ...
+                        'Rollback prune failed: %s', pruneErr.message);
+            end
+            rethrow(ME);
         end
 
         % Mark requested packages as directly installed and collect their FQNs
@@ -384,6 +398,16 @@ function installedFqn = installFromMhl(mhlSource, packagesDir, channel)
         % Clean up on error
         if exist(tempDir, 'dir')
             rmdir(tempDir, 's');
+        end
+        % If installFromRepository succeeded for the dependencies but the
+        % .mhl install itself failed (or vice-versa), prune any orphans
+        % that were left behind.
+        fprintf('\nInstall failed; rolling back any orphaned dependencies...\n');
+        try
+            mip.utils.prune_unused_packages();
+        catch pruneErr
+            warning('mip:rollbackFailed', ...
+                    'Rollback prune failed: %s', pruneErr.message);
         end
         rethrow(ME);
     end

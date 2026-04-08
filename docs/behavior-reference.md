@@ -221,6 +221,8 @@ Priority: exact match > `numbl_wasm` fallback > `any`.
 2. Mark the **user-requested** packages (not their dependencies) as "directly installed" in `directly_installed.txt`.
 3. Print a summary with load hints.
 
+If any package in step 1 fails (download error, extraction failure, etc.), the install loop aborts and `mip install` runs the same prune logic that `mip uninstall` uses (`mip.utils.prune_unused_packages`). Because the user-requested packages haven't been added to `directly_installed.txt` yet, any dependencies that did install successfully during this call get pruned as orphans, leaving the package set as it was before the call -- modulo any pre-existing orphans, which the prune sweep will also remove. The original install error is then re-raised. See [§14.11](#1411-no-rollback-on-failed-install).
+
 #### 3.1.7 Already-Installed Behavior
 
 If a package is already installed, `mip install` prints a message and skips it. It does **not** error. It does **not** reinstall or upgrade. Use `mip update` for that.
@@ -843,9 +845,15 @@ A potential middle ground: at install time, resolve bare-name deps using same-ch
 
 **Question**: Should there be a `mip update --recursive` or `mip update --all` that updates a package and all its dependencies?
 
-### 14.11 No Rollback on Failed Install
+### 14.11 Rollback on Failed Install
 
-**Current behavior**: If an install fails mid-way (e.g., download error), cleanup removes the partial directory. But if the package had dependencies that were installed as part of the same operation, those dependencies are not rolled back.
+**Current behavior**: If an install fails mid-way (e.g., download error), `downloadAndInstall` removes its own partial directory and `mip install` then runs `mip.utils.prune_unused_packages` to roll back any dependencies that were installed during the same call. The user-requested packages haven't been added to `directly_installed.txt` yet, so anything installed by this call that isn't already a directly-installed package or one of its needed dependencies is pruned as an orphan. The original install error is re-raised.
+
+**Resolved in [#100](https://github.com/mip-org/mip/issues/100)** by extracting `mip.utils.prune_unused_packages` (formerly a private helper inside `mip uninstall`) and reusing it from the install failure path.
+
+**Caveats**:
+- The rollback prune sweep also removes any *pre-existing* orphans (packages that were already on disk but not in `directly_installed.txt`). In practice this is fine -- those should have been pruned already -- but it's a minor side effect to be aware of.
+- If `mip.utils.prune_unused_packages` itself fails, a `mip:rollbackFailed` warning is printed and the original install error is still re-raised.
 
 ### 14.12 Empty `MIP_ROOT` Environment Variable
 
