@@ -290,6 +290,30 @@ classdef TestInstallRemote < matlab.unittest.TestCase
                 'mip install pkg (no @version) should not upgrade');
         end
 
+        function testInstallFromChannel_FQNVersionConstraintHonored(testCase)
+            % FQN with @version pointing to a non-primary channel must
+            % install the requested version, not the channel's best version.
+            % Regression test: requestedVersions used to be name-keyed and
+            % only applied to the primary channel index fetch, so this
+            % silently installed the channel's default best version.
+            mip.install('mip-org/test-channel1/alpha@1.0.0');
+
+            pkgDir = fullfile(testCase.TestRoot, 'packages', ...
+                'mip-org', 'test-channel1', 'alpha');
+            info = mip.utils.read_package_json(pkgDir);
+            testCase.verifyEqual(info.version, '1.0.0', ...
+                'FQN @version should reach the FQN''s channel');
+        end
+
+        function testInstallFromChannel_FQNVersionConstraintNotFoundErrors(testCase)
+            % If the requested @version doesn't exist in the FQN's channel,
+            % mip:versionNotFound should be raised (not silently fall through
+            % to the best version).
+            testCase.verifyError(@() ...
+                mip.install('mip-org/test-channel1/alpha@99.99.99'), ...
+                'mip:versionNotFound');
+        end
+
         function testInstallFromChannel_VersionUpgradePreservesLoadState(testCase)
             % If the package was loaded before the upgrade, it should be
             % reloaded after the new version is installed.

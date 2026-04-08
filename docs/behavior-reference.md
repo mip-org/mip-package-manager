@@ -857,9 +857,7 @@ A potential middle ground: at install time, resolve bare-name deps using same-ch
 
 **Current behavior**: Only one version of a package can be installed per FQN. The same package name can exist at different versions on different channels (e.g., `mip-org/core/pkg` at v1 and `mylab/custom/pkg` at v2) -- those are independent installs.
 
-**Resolved in [#102](https://github.com/mip-org/mip/issues/102)**: `mip install pkg@2.0` when a different version of `pkg` is already installed silently replaces it (uninstall + install). See [§3.1.7](#317-already-installed-behavior). This only applies when the user passed an explicit `@version`; without `@version`, the existing "already installed" behavior is unchanged.
-
-**Known limitation**: The version-constraint logic only applies `requestedVersions` to the primary channel index fetch. For an FQN argument that points to a non-primary channel (e.g. `mip install mylab/extra/foo@2.0` with no `--channel`), the requested version is silently ignored and the channel's best version is installed instead. The upgrade logic above guards against this by only triggering when the version that would actually be installed matches the requested version. A proper fix should key `requestedVersions` by FQN rather than bare name.
+**Resolved in [#102](https://github.com/mip-org/mip/issues/102)**: `mip install pkg@2.0` when a different version of `pkg` is already installed silently replaces it (uninstall + install). See [§3.1.7](#317-already-installed-behavior). This only applies when the user passed an explicit `@version`; without `@version`, the existing "already installed" behavior is unchanged. `@version` is honored regardless of whether the request is bare-name or a FQN to any channel.
 
 Lock files (#96) and dependency version constraints (#95) are out of scope for now.
 

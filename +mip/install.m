@@ -147,18 +147,21 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
     fprintf('Detected architecture: %s\n', currentArch);
 
     % Resolve each package argument to org/channel/name (with optional version)
-    % The --channel flag only applies to user-specified bare names, not dependencies
+    % The --channel flag only applies to user-specified bare names, not dependencies.
+    % requestedVersions is keyed by FQN so a version constraint reaches the right
+    % channel even when the FQN points to a non-primary channel.
     resolvedPackages = {};  % cell array of structs with .org, .channel, .name, .fqn, .requested_version
     requestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
     for i = 1:length(repoPackages)
         pkg = repoPackages{i};
         [org, ch, name, version] = mip.utils.resolve_package_name(pkg, channel);
+        fqn = mip.utils.make_fqn(org, ch, name);
         s = struct('org', org, 'channel', ch, 'name', name, ...
-                   'fqn', mip.utils.make_fqn(org, ch, name), ...
+                   'fqn', fqn, ...
                    'requested_version', version);
         resolvedPackages{end+1} = s;
         if ~isempty(version)
-            requestedVersions(name) = version;
+            requestedVersions(fqn) = version;
         end
     end
 
@@ -186,7 +189,7 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
     for i = 1:length(channelsToFetch)
         ch = channelsToFetch{i};
         fetchChannelIndex(ch, packageInfoMap, unavailablePackages, ...
-                          fetchedChannels, requestedVersions, channel);
+                          fetchedChannels, requestedVersions);
     end
 
     % Check if any requested packages are unavailable
@@ -245,7 +248,7 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
             % Fetch the missing channel's index
             fprintf('Fetching %s index for cross-channel dependency...\n', missingChannel);
             fetchChannelIndex(missingChannel, packageInfoMap, unavailablePackages, ...
-                              fetchedChannels, requestedVersions, channel);
+                              fetchedChannels, requestedVersions);
         end
     end
     allRequiredFqns = unique(allRequiredFqns, 'stable');
@@ -495,7 +498,7 @@ function downloadAndInstall(fqn, packageInfo, pkgDir)
     end
 end
 
-function fetchChannelIndex(ch, packageInfoMap, unavailablePackages, fetchedChannels, requestedVersions, primaryChannel)
+function fetchChannelIndex(ch, packageInfoMap, unavailablePackages, fetchedChannels, requestedVersions)
 % Fetch a channel's index and merge into the package info map.
     if fetchedChannels.isKey(ch)
         return
@@ -503,12 +506,18 @@ function fetchChannelIndex(ch, packageInfoMap, unavailablePackages, fetchedChann
     fprintf('Fetching package index for %s...\n', ch);
     [chOrg, chName] = mip.utils.parse_channel_spec(ch);
     chIndex = mip.utils.fetch_index(ch);
-    % Apply version constraints only if this is the primary channel
-    if strcmp(ch, primaryChannel)
-        [chMap, chUnavail] = mip.utils.build_package_info_map(chIndex, chOrg, chName, requestedVersions);
-    else
-        [chMap, chUnavail] = mip.utils.build_package_info_map(chIndex, chOrg, chName);
+    % Project the FQN-keyed requestedVersions down to a name-keyed map
+    % containing only entries that target this channel. build_package_info_map
+    % expects bare-name keys.
+    chRequestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
+    fqnKeys = keys(requestedVersions);
+    for j = 1:length(fqnKeys)
+        parsed = mip.utils.parse_package_arg(fqnKeys{j});
+        if strcmp(parsed.org, chOrg) && strcmp(parsed.channel, chName)
+            chRequestedVersions(parsed.name) = requestedVersions(fqnKeys{j});
+        end
     end
+    [chMap, chUnavail] = mip.utils.build_package_info_map(chIndex, chOrg, chName, chRequestedVersions);
     chKeys = keys(chMap);
     for j = 1:length(chKeys)
         packageInfoMap(chKeys{j}) = chMap(chKeys{j});
