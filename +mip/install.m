@@ -148,13 +148,14 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
 
     % Resolve each package argument to org/channel/name (with optional version)
     % The --channel flag only applies to user-specified bare names, not dependencies
-    resolvedPackages = {};  % cell array of structs with .org, .channel, .name, .fqn
+    resolvedPackages = {};  % cell array of structs with .org, .channel, .name, .fqn, .requested_version
     requestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
     for i = 1:length(repoPackages)
         pkg = repoPackages{i};
         [org, ch, name, version] = mip.utils.resolve_package_name(pkg, channel);
         s = struct('org', org, 'channel', ch, 'name', name, ...
-                   'fqn', mip.utils.make_fqn(org, ch, name));
+                   'fqn', mip.utils.make_fqn(org, ch, name), ...
+                   'requested_version', version);
         resolvedPackages{end+1} = s;
         if ~isempty(version)
             requestedVersions(name) = version;
@@ -252,6 +253,40 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
     % Sort topologically
     allPackagesToInstall = mip.dependency.topological_sort(allRequiredFqns, packageInfoMap);
 
+    % If a user-requested package was given an explicit @version and a
+    % different version is currently installed, replace it. Unload first
+    % so the install loop below sees a clean slate, and remember to reload
+    % afterward. Only trigger when the version that would actually be
+    % installed matches the requested version -- otherwise we'd rip out the
+    % installed copy only to install the wrong version.
+    reloadAfterInstall = {};
+    for i = 1:length(resolvedPackages)
+        s = resolvedPackages{i};
+        if isempty(s.requested_version)
+            continue;
+        end
+        pkgDir = mip.utils.get_package_dir(s.org, s.channel, s.name);
+        if ~exist(pkgDir, 'dir')
+            continue;
+        end
+        installedInfo = mip.utils.read_package_json(pkgDir);
+        if strcmp(installedInfo.version, s.requested_version)
+            continue;  % Already at requested version
+        end
+        if ~packageInfoMap.isKey(s.fqn) || ...
+                ~strcmp(packageInfoMap(s.fqn).version, s.requested_version)
+            continue;  % Would install a different version; leave alone
+        end
+        fprintf('Replacing "%s" %s with requested version %s...\n', ...
+                s.fqn, installedInfo.version, s.requested_version);
+        if mip.utils.is_loaded(s.fqn)
+            mip.unload(s.fqn);
+            reloadAfterInstall{end+1} = s.fqn;
+        end
+        rmdir(pkgDir, 's');
+        mip.utils.remove_directly_installed(s.fqn);
+    end
+
     % Determine which packages need installing vs already installed
     toInstallFqns = {};
     alreadyInstalled = {};
@@ -305,6 +340,13 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
                 installedFqns{end+1} = s.fqn;
             end
         end
+    end
+
+    % Reload any packages that were unloaded as part of an @version replacement
+    for i = 1:length(reloadAfterInstall)
+        fqn = reloadAfterInstall{i};
+        fprintf('Reloading "%s"...\n', fqn);
+        mip.load(fqn);
     end
 
     % Warn if any installed package name exists in multiple channels

@@ -216,6 +216,97 @@ classdef TestInstallRemote < matlab.unittest.TestCase
                 'Package should still be installed');
         end
 
+        %% --- @version upgrade behavior (issue #102) ---
+
+        function testInstallFromChannel_VersionUpgradeReplacesInstalled(testCase)
+            % Install alpha@1.0.0, then mip install alpha@2.0.0 should
+            % silently replace the installed version with the requested one.
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
+
+            pkgDir = fullfile(testCase.TestRoot, 'packages', ...
+                'mip-org', 'test-channel1', 'alpha');
+            info1 = mip.utils.read_package_json(pkgDir);
+            testCase.verifyEqual(info1.version, '1.0.0');
+
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha@2.0.0');
+
+            info2 = mip.utils.read_package_json(pkgDir);
+            testCase.verifyEqual(info2.version, '2.0.0', ...
+                'alpha should be upgraded to the requested version');
+        end
+
+        function testInstallFromChannel_VersionDowngradeReplacesInstalled(testCase)
+            % Install alpha@2.0.0, then mip install alpha@1.0.0 should
+            % silently replace it (downgrade is also a "replace").
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha@2.0.0');
+
+            pkgDir = fullfile(testCase.TestRoot, 'packages', ...
+                'mip-org', 'test-channel1', 'alpha');
+            info1 = mip.utils.read_package_json(pkgDir);
+            testCase.verifyEqual(info1.version, '2.0.0');
+
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
+
+            info2 = mip.utils.read_package_json(pkgDir);
+            testCase.verifyEqual(info2.version, '1.0.0', ...
+                'alpha should be downgraded to the requested version');
+        end
+
+        function testInstallFromChannel_SameVersionStaysInstalled(testCase)
+            % Installing the same @version twice is idempotent (no replace).
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
+
+            pkgDir = fullfile(testCase.TestRoot, 'packages', ...
+                'mip-org', 'test-channel1', 'alpha');
+            info1 = mip.utils.read_package_json(pkgDir);
+            timestamp1 = info1.timestamp;
+
+            pause(1.1);
+
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
+
+            info2 = mip.utils.read_package_json(pkgDir);
+            testCase.verifyEqual(info2.version, '1.0.0');
+            testCase.verifyEqual(info2.timestamp, timestamp1, ...
+                'Same @version should not trigger reinstall');
+        end
+
+        function testInstallFromChannel_NoVersionDoesNotUpgrade(testCase)
+            % Without an explicit @version, the existing "already installed"
+            % behavior wins -- mip install does not auto-upgrade.
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
+
+            pkgDir = fullfile(testCase.TestRoot, 'packages', ...
+                'mip-org', 'test-channel1', 'alpha');
+            info1 = mip.utils.read_package_json(pkgDir);
+            testCase.verifyEqual(info1.version, '1.0.0');
+
+            % No @version -- alpha 2.0.0 is the channel's best version,
+            % but we should NOT auto-upgrade.
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha');
+
+            info2 = mip.utils.read_package_json(pkgDir);
+            testCase.verifyEqual(info2.version, '1.0.0', ...
+                'mip install pkg (no @version) should not upgrade');
+        end
+
+        function testInstallFromChannel_VersionUpgradePreservesLoadState(testCase)
+            % If the package was loaded before the upgrade, it should be
+            % reloaded after the new version is installed.
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
+            mip.load('mip-org/test-channel1/alpha');
+            testCase.verifyTrue(mip.utils.is_loaded('mip-org/test-channel1/alpha'));
+
+            mip.install('--channel', 'mip-org/test-channel1', 'alpha@2.0.0');
+
+            testCase.verifyTrue(mip.utils.is_loaded('mip-org/test-channel1/alpha'), ...
+                'alpha should be reloaded after the @version replace');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', ...
+                'mip-org', 'test-channel1', 'alpha');
+            info = mip.utils.read_package_json(pkgDir);
+            testCase.verifyEqual(info.version, '2.0.0');
+        end
+
     end
 
 end
