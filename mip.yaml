@@ -9,5 +9,7 @@ dependencies: []
 addpaths:
   - path: "."
 
+test_script: test.m
+
 builds:
   - architectures: [any]

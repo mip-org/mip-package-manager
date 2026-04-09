@@ -331,6 +331,55 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             testCase.verifyEqual(info.version, '2.0.0');
         end
 
+        %% --- --channel + FQN interaction (issue #105) ---
+
+        function testInstallFromChannel_FQNIgnoresChannelFlag(testCase)
+            % FQN takes precedence over --channel; the package should be
+            % installed in the FQN's channel, not the --channel value.
+            mip.install('--channel', 'mip-org/test-channel2', ...
+                        'mip-org/test-channel1/alpha');
+
+            installedDir = fullfile(testCase.TestRoot, 'packages', ...
+                'mip-org', 'test-channel1', 'alpha');
+            wrongDir = fullfile(testCase.TestRoot, 'packages', ...
+                'mip-org', 'test-channel2', 'alpha');
+
+            testCase.verifyTrue(exist(installedDir, 'dir') > 0, ...
+                'alpha should be installed in test-channel1 (from FQN)');
+            testCase.verifyFalse(exist(wrongDir, 'dir') > 0, ...
+                'alpha should NOT be installed in test-channel2 (--channel ignored)');
+        end
+
+        function testInstallFromChannel_FQNOnlySkipsSpuriousFetch(testCase)
+            % When all args are FQNs, --channel is ignored entirely --
+            % including its index fetch. Pointing --channel at a
+            % nonexistent channel must NOT cause an error.
+            mip.install('--channel', 'nonexistent-org/nonexistent-channel', ...
+                        'mip-org/test-channel1/alpha');
+
+            pkgDir = fullfile(testCase.TestRoot, 'packages', ...
+                'mip-org', 'test-channel1', 'alpha');
+            testCase.verifyTrue(exist(pkgDir, 'dir') > 0, ...
+                'alpha should be installed even with bogus --channel');
+        end
+
+        function testInstallFromChannel_MixedFQNAndBareUsesChannelForBare(testCase)
+            % Mixed call: --channel applies to the bare-name arg,
+            % FQN arg uses its own channel.
+            mip.install('--channel', 'mip-org/test-channel1', ...
+                        'alpha', 'mip-org/test-channel2/beta');
+
+            alphaDir = fullfile(testCase.TestRoot, 'packages', ...
+                'mip-org', 'test-channel1', 'alpha');
+            betaDir = fullfile(testCase.TestRoot, 'packages', ...
+                'mip-org', 'test-channel2', 'beta');
+
+            testCase.verifyTrue(exist(alphaDir, 'dir') > 0, ...
+                'bare-name alpha should be installed from --channel value');
+            testCase.verifyTrue(exist(betaDir, 'dir') > 0, ...
+                'FQN beta should be installed from its own channel');
+        end
+
     end
 
 end

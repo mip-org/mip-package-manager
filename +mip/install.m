@@ -140,20 +140,21 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
 
     [defaultOrg, defaultChan] = mip.utils.parse_channel_spec(channel);
 
-    fprintf('Using channel: %s/%s\n', defaultOrg, defaultChan);
-
-    % Get current architecture
-    currentArch = mip.arch();
-    fprintf('Detected architecture: %s\n', currentArch);
-
-    % Resolve each package argument to org/channel/name (with optional version)
-    % The --channel flag only applies to user-specified bare names, not dependencies.
-    % requestedVersions is keyed by FQN so a version constraint reaches the right
-    % channel even when the FQN points to a non-primary channel.
+    % Resolve each package argument to org/channel/name (with optional version).
+    % FQN arguments use the org/channel encoded in the name; the --channel flag
+    % only applies to bare-name arguments. If every argument is a FQN, the
+    % --channel value is ignored entirely (no warning, no index fetch).
+    % requestedVersions is keyed by FQN so a version constraint reaches the
+    % right channel even when the FQN points to a non-primary channel.
     resolvedPackages = {};  % cell array of structs with .org, .channel, .name, .fqn, .requested_version
     requestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
+    hasBareName = false;
     for i = 1:length(repoPackages)
         pkg = repoPackages{i};
+        parsed = mip.utils.parse_package_arg(pkg);
+        if ~parsed.is_fqn
+            hasBareName = true;
+        end
         [org, ch, name, version] = mip.utils.resolve_package_name(pkg, channel);
         fqn = mip.utils.make_fqn(org, ch, name);
         s = struct('org', org, 'channel', ch, 'name', name, ...
@@ -165,17 +166,27 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
         end
     end
 
+    if hasBareName
+        fprintf('Using channel: %s/%s\n', defaultOrg, defaultChan);
+    end
+
+    % Get current architecture
+    currentArch = mip.arch();
+    fprintf('Detected architecture: %s\n', currentArch);
+
     % Build package info map by fetching indexes for all needed channels.
     % Always fetch mip-org/core (bare-name deps resolve there).
-    % Also fetch the default channel and any channels referenced by FQN args.
+    % Fetch the primary channel only if there is at least one bare-name
+    % argument (otherwise --channel is being ignored entirely).
+    % Also fetch any channels referenced by FQN args.
     packageInfoMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
     unavailablePackages = containers.Map('KeyType', 'char', 'ValueType', 'any');
     fetchedChannels = containers.Map('KeyType', 'char', 'ValueType', 'logical');
 
     % Collect all channels we need upfront
-    channelsToFetch = {channel};
-    if ~(strcmp(defaultOrg, 'mip-org') && strcmp(defaultChan, 'core'))
-        channelsToFetch{end+1} = 'mip-org/core';
+    channelsToFetch = {'mip-org/core'};
+    if hasBareName && ~ismember(channel, channelsToFetch)
+        channelsToFetch{end+1} = channel;
     end
     for i = 1:length(resolvedPackages)
         s = resolvedPackages{i};
@@ -326,13 +337,27 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
         end
         fprintf('\n');
 
-        % Install each package
-        for i = 1:length(toInstallFqns)
-            fqn = toInstallFqns{i};
-            pkgInfo = packageInfoMap(fqn);
-            result = mip.utils.parse_package_arg(fqn);
-            pkgDir = mip.utils.get_package_dir(result.org, result.channel, result.name);
-            downloadAndInstall(fqn, pkgInfo, pkgDir);
+        % Install each package. If any package fails midway, the
+        % already-installed-during-this-call dependencies are still on disk
+        % but not in directly_installed.txt -- prune them so a failed
+        % install doesn't leave orphans behind.
+        try
+            for i = 1:length(toInstallFqns)
+                fqn = toInstallFqns{i};
+                pkgInfo = packageInfoMap(fqn);
+                result = mip.utils.parse_package_arg(fqn);
+                pkgDir = mip.utils.get_package_dir(result.org, result.channel, result.name);
+                downloadAndInstall(fqn, pkgInfo, pkgDir);
+            end
+        catch ME
+            fprintf('\nInstall failed; rolling back any orphaned dependencies...\n');
+            try
+                mip.utils.prune_unused_packages();
+            catch pruneErr
+                warning('mip:rollbackFailed', ...
+                        'Rollback prune failed: %s', pruneErr.message);
+            end
+            rethrow(ME);
         end
 
         % Mark requested packages as directly installed and collect their FQNs
@@ -429,6 +454,16 @@ function installedFqn = installFromMhl(mhlSource, packagesDir, channel)
         % Clean up on error
         if exist(tempDir, 'dir')
             rmdir(tempDir, 's');
+        end
+        % If installFromRepository succeeded for the dependencies but the
+        % .mhl install itself failed (or vice-versa), prune any orphans
+        % that were left behind.
+        fprintf('\nInstall failed; rolling back any orphaned dependencies...\n');
+        try
+            mip.utils.prune_unused_packages();
+        catch pruneErr
+            warning('mip:rollbackFailed', ...
+                    'Rollback prune failed: %s', pruneErr.message);
         end
         rethrow(ME);
     end

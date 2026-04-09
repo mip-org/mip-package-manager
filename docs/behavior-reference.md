@@ -170,13 +170,14 @@ Used by: `mip install` for remote packages
 
 #### 3.1.1 Channel Resolution
 
-1. If `--channel` is provided, use it. Otherwise default to `mip-org/core`.
-2. FQN arguments override `--channel` -- the org/channel from the FQN is used.
+1. If `--channel` is provided, use it as the primary channel for any bare-name arguments. Otherwise default to `mip-org/core`.
+2. FQN arguments use the org/channel encoded in the name; `--channel` does not apply to them.
+3. If every package argument is a FQN, the `--channel` value is ignored entirely (no warning, no index fetch). See [§14.18](#1418--channel-flag-interaction-with-fqn).
 
 #### 3.1.2 Index Fetching
 
-1. Always fetch the primary channel index.
-2. Always fetch `mip-org/core` index (unless it is the primary channel).
+1. Always fetch the `mip-org/core` index (bare-name dependencies always resolve there -- see [§3.1.5](#315-dependency-resolution)).
+2. If at least one bare-name argument is present, fetch the primary channel index (`--channel` value, or `mip-org/core` by default). When all arguments are FQNs, the primary channel is not fetched.
 3. Also fetch indexes for any channels referenced by FQN arguments.
 4. During dependency resolution, if a cross-channel FQN dependency is missing, fetch its channel lazily (up to 10 retry attempts).
 
@@ -220,6 +221,8 @@ Priority: exact match > `numbl_wasm` fallback > `any`.
    - Extract to `~/.mip/packages/<org>/<channel>/<name>/`.
 2. Mark the **user-requested** packages (not their dependencies) as "directly installed" in `directly_installed.txt`.
 3. Print a summary with load hints.
+
+If any package in step 1 fails (download error, extraction failure, etc.), the install loop aborts and `mip install` runs the same prune logic that `mip uninstall` uses (`mip.utils.prune_unused_packages`). Because the user-requested packages haven't been added to `directly_installed.txt` yet, any dependencies that did install successfully during this call get pruned as orphans, leaving the package set as it was before the call -- modulo any pre-existing orphans, which the prune sweep will also remove. The original install error is then re-raised. See [§14.11](#1411-no-rollback-on-failed-install).
 
 #### 3.1.7 Already-Installed Behavior
 
@@ -496,7 +499,7 @@ Using an FQN bypasses this check entirely.
 5. Reinstall from source (preserving editable/non-editable mode).
 6. Reload if it was previously loaded.
 
-Local updates **always** reinstall (no up-to-date check). Timestamps change on every update.
+Local updates **always** reinstall (no up-to-date check). Timestamps change on every update. For editable installs the `compile_script` runs again on every update; the `--no-compile` flag from the original install is **not** preserved. See [§14.16](#1416-mip-update-on-local-package-always-reinstalls).
 
 ### 7.3 Force Update (`--force`)
 
@@ -845,9 +848,15 @@ A potential middle ground: at install time, resolve bare-name deps using same-ch
 
 **Question**: Should there be a `mip update --recursive` or `mip update --all` that updates a package and all its dependencies?
 
-### 14.11 No Rollback on Failed Install
+### 14.11 Rollback on Failed Install
 
-**Current behavior**: If an install fails mid-way (e.g., download error), cleanup removes the partial directory. But if the package had dependencies that were installed as part of the same operation, those dependencies are not rolled back.
+**Current behavior**: If an install fails mid-way (e.g., download error), `downloadAndInstall` removes its own partial directory and `mip install` then runs `mip.utils.prune_unused_packages` to roll back any dependencies that were installed during the same call. The user-requested packages haven't been added to `directly_installed.txt` yet, so anything installed by this call that isn't already a directly-installed package or one of its needed dependencies is pruned as an orphan. The original install error is re-raised.
+
+**Resolved in [#100](https://github.com/mip-org/mip/issues/100)** by extracting `mip.utils.prune_unused_packages` (formerly a private helper inside `mip uninstall`) and reusing it from the install failure path.
+
+**Caveats**:
+- The rollback prune sweep also removes any *pre-existing* orphans (packages that were already on disk but not in `directly_installed.txt`). In practice this is fine -- those should have been pruned already -- but it's a minor side effect to be aware of.
+- If `mip.utils.prune_unused_packages` itself fails, a `mip:rollbackFailed` warning is printed and the original install error is still re-raised.
 
 ### 14.12 Empty `MIP_ROOT` Environment Variable
 
@@ -884,9 +893,12 @@ The following behaviors are specified in this document but not fully covered by 
 
 ### 14.16 `mip update` on Local Package Always Reinstalls
 
-**Current behavior**: `mip update local/local/pkg` always deletes and reinstalls from source, even if nothing changed. This is because there's no way to compare local state efficiently.
+**Current behavior**: `mip update local/local/pkg` always deletes and reinstalls from source, even if nothing changed (see [§7.2](#72-local-package-update)). For editable installs the `compile_script` runs again on every update.
 
-**Question**: Should there be a source hash comparison to skip unnecessary reinstalls?
+This behavior is intentional and was confirmed in [#103](https://github.com/mip-org/mip/issues/103):
+- Unconditional uninstall + reinstall is the expected semantics for `mip update` on a local package — `mip update` is the user's "rebuild from source" hammer.
+- For editable installs, recompiling is wanted: the user almost certainly edited source that needs rebuilding.
+- A future `mip update --all` should **not** include local packages.
 
 ### 14.17 `load_package.m` Error Handling
 
@@ -896,6 +908,6 @@ The following behaviors are specified in this document but not fully covered by 
 
 ### 14.18 `--channel` Flag Interaction with FQN
 
-**Current behavior**: When using `mip install org/chan/pkg --channel other/chan`, the FQN takes precedence and `--channel` is ignored for that package. But `--channel` still affects the channel index fetch for bare-name dependencies.
+**Current behavior**: When using `mip install org/chan/pkg --channel other/chan`, the FQN takes precedence and `--channel` is silently ignored for that package -- no warning, no error. If every package argument is a FQN, `--channel` is ignored entirely: its index is not fetched and the "Using channel" line is not printed. In a mixed call (`mip install <fqn> <bare> --channel <other>`), `--channel` applies only to the bare-name argument.
 
-**Question**: Should using `--channel` with a FQN argument produce a warning that it's being ignored?
+This behavior is intentional and was confirmed in [#105](https://github.com/mip-org/mip/issues/105). Bare-name dependencies in `mip.json` are always resolved to `mip-org/core` (see [§3.1.5](#315-dependency-resolution)) and are unaffected by `--channel`.
