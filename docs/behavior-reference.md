@@ -170,13 +170,14 @@ Used by: `mip install` for remote packages
 
 #### 3.1.1 Channel Resolution
 
-1. If `--channel` is provided, use it. Otherwise default to `mip-org/core`.
-2. FQN arguments override `--channel` -- the org/channel from the FQN is used.
+1. If `--channel` is provided, use it as the primary channel for any bare-name arguments. Otherwise default to `mip-org/core`.
+2. FQN arguments use the org/channel encoded in the name; `--channel` does not apply to them.
+3. If every package argument is a FQN, the `--channel` value is ignored entirely (no warning, no index fetch). See [§14.18](#1418--channel-flag-interaction-with-fqn).
 
 #### 3.1.2 Index Fetching
 
-1. Always fetch the primary channel index.
-2. Always fetch `mip-org/core` index (unless it is the primary channel).
+1. Always fetch the `mip-org/core` index (bare-name dependencies always resolve there -- see [§3.1.5](#315-dependency-resolution)).
+2. If at least one bare-name argument is present, fetch the primary channel index (`--channel` value, or `mip-org/core` by default). When all arguments are FQNs, the primary channel is not fetched.
 3. Also fetch indexes for any channels referenced by FQN arguments.
 4. During dependency resolution, if a cross-channel FQN dependency is missing, fetch its channel lazily (up to 10 retry attempts).
 
@@ -892,6 +893,6 @@ The following behaviors are specified in this document but not fully covered by 
 
 ### 14.18 `--channel` Flag Interaction with FQN
 
-**Current behavior**: When using `mip install org/chan/pkg --channel other/chan`, the FQN takes precedence and `--channel` is ignored for that package. But `--channel` still affects the channel index fetch for bare-name dependencies.
+**Current behavior**: When using `mip install org/chan/pkg --channel other/chan`, the FQN takes precedence and `--channel` is silently ignored for that package -- no warning, no error. If every package argument is a FQN, `--channel` is ignored entirely: its index is not fetched and the "Using channel" line is not printed. In a mixed call (`mip install <fqn> <bare> --channel <other>`), `--channel` applies only to the bare-name argument.
 
-**Question**: Should using `--channel` with a FQN argument produce a warning that it's being ignored?
+This behavior is intentional and was confirmed in [#105](https://github.com/mip-org/mip/issues/105). Bare-name dependencies in `mip.json` are always resolved to `mip-org/core` (see [§3.1.5](#315-dependency-resolution)) and are unaffected by `--channel`.

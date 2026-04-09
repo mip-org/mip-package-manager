@@ -140,18 +140,19 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
 
     [defaultOrg, defaultChan] = mip.utils.parse_channel_spec(channel);
 
-    fprintf('Using channel: %s/%s\n', defaultOrg, defaultChan);
-
-    % Get current architecture
-    currentArch = mip.arch();
-    fprintf('Detected architecture: %s\n', currentArch);
-
-    % Resolve each package argument to org/channel/name (with optional version)
-    % The --channel flag only applies to user-specified bare names, not dependencies
+    % Resolve each package argument to org/channel/name (with optional version).
+    % FQN arguments use the org/channel encoded in the name; the --channel flag
+    % only applies to bare-name arguments. If every argument is a FQN, the
+    % --channel value is ignored entirely (no warning, no index fetch).
     resolvedPackages = {};  % cell array of structs with .org, .channel, .name, .fqn
     requestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
+    hasBareName = false;
     for i = 1:length(repoPackages)
         pkg = repoPackages{i};
+        parsed = mip.utils.parse_package_arg(pkg);
+        if ~parsed.is_fqn
+            hasBareName = true;
+        end
         [org, ch, name, version] = mip.utils.resolve_package_name(pkg, channel);
         s = struct('org', org, 'channel', ch, 'name', name, ...
                    'fqn', mip.utils.make_fqn(org, ch, name));
@@ -161,17 +162,27 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
         end
     end
 
+    if hasBareName
+        fprintf('Using channel: %s/%s\n', defaultOrg, defaultChan);
+    end
+
+    % Get current architecture
+    currentArch = mip.arch();
+    fprintf('Detected architecture: %s\n', currentArch);
+
     % Build package info map by fetching indexes for all needed channels.
     % Always fetch mip-org/core (bare-name deps resolve there).
-    % Also fetch the default channel and any channels referenced by FQN args.
+    % Fetch the primary channel only if there is at least one bare-name
+    % argument (otherwise --channel is being ignored entirely).
+    % Also fetch any channels referenced by FQN args.
     packageInfoMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
     unavailablePackages = containers.Map('KeyType', 'char', 'ValueType', 'any');
     fetchedChannels = containers.Map('KeyType', 'char', 'ValueType', 'logical');
 
     % Collect all channels we need upfront
-    channelsToFetch = {channel};
-    if ~(strcmp(defaultOrg, 'mip-org') && strcmp(defaultChan, 'core'))
-        channelsToFetch{end+1} = 'mip-org/core';
+    channelsToFetch = {'mip-org/core'};
+    if hasBareName && ~ismember(channel, channelsToFetch)
+        channelsToFetch{end+1} = channel;
     end
     for i = 1:length(resolvedPackages)
         s = resolvedPackages{i};
