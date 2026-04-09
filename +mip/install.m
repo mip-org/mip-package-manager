@@ -144,7 +144,9 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
     % FQN arguments use the org/channel encoded in the name; the --channel flag
     % only applies to bare-name arguments. If every argument is a FQN, the
     % --channel value is ignored entirely (no warning, no index fetch).
-    resolvedPackages = {};  % cell array of structs with .org, .channel, .name, .fqn
+    % requestedVersions is keyed by FQN so a version constraint reaches the
+    % right channel even when the FQN points to a non-primary channel.
+    resolvedPackages = {};  % cell array of structs with .org, .channel, .name, .fqn, .requested_version
     requestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
     hasBareName = false;
     for i = 1:length(repoPackages)
@@ -154,11 +156,13 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
             hasBareName = true;
         end
         [org, ch, name, version] = mip.utils.resolve_package_name(pkg, channel);
+        fqn = mip.utils.make_fqn(org, ch, name);
         s = struct('org', org, 'channel', ch, 'name', name, ...
-                   'fqn', mip.utils.make_fqn(org, ch, name));
+                   'fqn', fqn, ...
+                   'requested_version', version);
         resolvedPackages{end+1} = s;
         if ~isempty(version)
-            requestedVersions(name) = version;
+            requestedVersions(fqn) = version;
         end
     end
 
@@ -196,7 +200,7 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
     for i = 1:length(channelsToFetch)
         ch = channelsToFetch{i};
         fetchChannelIndex(ch, packageInfoMap, unavailablePackages, ...
-                          fetchedChannels, requestedVersions, channel);
+                          fetchedChannels, requestedVersions);
     end
 
     % Check if any requested packages are unavailable
@@ -255,13 +259,47 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
             % Fetch the missing channel's index
             fprintf('Fetching %s index for cross-channel dependency...\n', missingChannel);
             fetchChannelIndex(missingChannel, packageInfoMap, unavailablePackages, ...
-                              fetchedChannels, requestedVersions, channel);
+                              fetchedChannels, requestedVersions);
         end
     end
     allRequiredFqns = unique(allRequiredFqns, 'stable');
 
     % Sort topologically
     allPackagesToInstall = mip.dependency.topological_sort(allRequiredFqns, packageInfoMap);
+
+    % If a user-requested package was given an explicit @version and a
+    % different version is currently installed, replace it. Unload first
+    % so the install loop below sees a clean slate, and remember to reload
+    % afterward. Only trigger when the version that would actually be
+    % installed matches the requested version -- otherwise we'd rip out the
+    % installed copy only to install the wrong version.
+    reloadAfterInstall = {};
+    for i = 1:length(resolvedPackages)
+        s = resolvedPackages{i};
+        if isempty(s.requested_version)
+            continue;
+        end
+        pkgDir = mip.utils.get_package_dir(s.org, s.channel, s.name);
+        if ~exist(pkgDir, 'dir')
+            continue;
+        end
+        installedInfo = mip.utils.read_package_json(pkgDir);
+        if strcmp(installedInfo.version, s.requested_version)
+            continue;  % Already at requested version
+        end
+        if ~packageInfoMap.isKey(s.fqn) || ...
+                ~strcmp(packageInfoMap(s.fqn).version, s.requested_version)
+            continue;  % Would install a different version; leave alone
+        end
+        fprintf('Replacing "%s" %s with requested version %s...\n', ...
+                s.fqn, installedInfo.version, s.requested_version);
+        if mip.utils.is_loaded(s.fqn)
+            mip.unload(s.fqn);
+            reloadAfterInstall{end+1} = s.fqn;
+        end
+        rmdir(pkgDir, 's');
+        mip.utils.remove_directly_installed(s.fqn);
+    end
 
     % Determine which packages need installing vs already installed
     toInstallFqns = {};
@@ -330,6 +368,13 @@ function installedFqns = installFromRepository(repoPackages, ~, channel)
                 installedFqns{end+1} = s.fqn;
             end
         end
+    end
+
+    % Reload any packages that were unloaded as part of an @version replacement
+    for i = 1:length(reloadAfterInstall)
+        fqn = reloadAfterInstall{i};
+        fprintf('Reloading "%s"...\n', fqn);
+        mip.load(fqn);
     end
 
     % Warn if any installed package name exists in multiple channels
@@ -488,7 +533,7 @@ function downloadAndInstall(fqn, packageInfo, pkgDir)
     end
 end
 
-function fetchChannelIndex(ch, packageInfoMap, unavailablePackages, fetchedChannels, requestedVersions, primaryChannel)
+function fetchChannelIndex(ch, packageInfoMap, unavailablePackages, fetchedChannels, requestedVersions)
 % Fetch a channel's index and merge into the package info map.
     if fetchedChannels.isKey(ch)
         return
@@ -496,12 +541,18 @@ function fetchChannelIndex(ch, packageInfoMap, unavailablePackages, fetchedChann
     fprintf('Fetching package index for %s...\n', ch);
     [chOrg, chName] = mip.utils.parse_channel_spec(ch);
     chIndex = mip.utils.fetch_index(ch);
-    % Apply version constraints only if this is the primary channel
-    if strcmp(ch, primaryChannel)
-        [chMap, chUnavail] = mip.utils.build_package_info_map(chIndex, chOrg, chName, requestedVersions);
-    else
-        [chMap, chUnavail] = mip.utils.build_package_info_map(chIndex, chOrg, chName);
+    % Project the FQN-keyed requestedVersions down to a name-keyed map
+    % containing only entries that target this channel. build_package_info_map
+    % expects bare-name keys.
+    chRequestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
+    fqnKeys = keys(requestedVersions);
+    for j = 1:length(fqnKeys)
+        parsed = mip.utils.parse_package_arg(fqnKeys{j});
+        if strcmp(parsed.org, chOrg) && strcmp(parsed.channel, chName)
+            chRequestedVersions(parsed.name) = requestedVersions(fqnKeys{j});
+        end
     end
+    [chMap, chUnavail] = mip.utils.build_package_info_map(chIndex, chOrg, chName, chRequestedVersions);
     chKeys = keys(chMap);
     for j = 1:length(chKeys)
         packageInfoMap(chKeys{j}) = chMap(chKeys{j});

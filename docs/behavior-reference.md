@@ -228,6 +228,8 @@ If any package in step 1 fails (download error, extraction failure, etc.), the i
 
 If a package is already installed, `mip install` prints a message and skips it. It does **not** error. It does **not** reinstall or upgrade. Use `mip update` for that.
 
+**Exception** -- explicit version upgrade: if the user passed an explicit `@version` for a directly-requested package and a *different* version is currently installed, `mip install` silently replaces it (uninstall + install of the requested version, including unload-before / reload-after for the affected package). The replacement only triggers when the version that would actually be installed matches the requested version; otherwise the old install is left in place. See [§14.13](#1413-multiple-versions-of-the-same-package).
+
 #### 3.1.8 Multiple Packages
 
 `mip install pkg1 pkg2 pkg3` installs all listed packages and their combined dependencies in a single operation.
@@ -862,9 +864,11 @@ A potential middle ground: at install time, resolve bare-name deps using same-ch
 
 ### 14.13 Multiple Versions of the Same Package
 
-**Current behavior**: Only one version of a package can be installed per FQN. Installing a different version requires uninstalling first (or using `mip update`). However, the same package name can exist at different versions on different channels (e.g., `mip-org/core/pkg` at v1 and `mylab/custom/pkg` at v2).
+**Current behavior**: Only one version of a package can be installed per FQN. The same package name can exist at different versions on different channels (e.g., `mip-org/core/pkg` at v1 and `mylab/custom/pkg` at v2) -- those are independent installs.
 
-**Question**: Should `mip install pkg@2.0` auto-upgrade if v1 is already installed? Currently it just says "already installed".
+**Resolved in [#102](https://github.com/mip-org/mip/issues/102)**: `mip install pkg@2.0` when a different version of `pkg` is already installed silently replaces it (uninstall + install). See [§3.1.7](#317-already-installed-behavior). This only applies when the user passed an explicit `@version`; without `@version`, the existing "already installed" behavior is unchanged. `@version` is honored regardless of whether the request is bare-name or a FQN to any channel.
+
+Lock files (#96) and dependency version constraints (#95) are out of scope for now.
 
 ### 14.14 `mip.json` Dependencies Store Bare Names
 
