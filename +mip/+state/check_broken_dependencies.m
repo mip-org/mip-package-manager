@@ -70,22 +70,13 @@ end
 end
 
 function tf = isDependencyUninstalled(dep)
-    depResult = mip.parse.parse_package_arg(dep);
-    if depResult.is_fqn
-        depDir = mip.paths.get_package_dir(depResult.org, depResult.channel, depResult.name);
-        tf = ~exist(depDir, 'dir');
-    else
-        resolved = mip.resolve.resolve_bare_name(dep);
-        tf = isempty(resolved);
-    end
+    depFqn = mip.resolve.resolve_dependency(dep);
+    depResult = mip.parse.parse_package_arg(depFqn);
+    depDir = mip.paths.get_package_dir(depResult.org, depResult.channel, depResult.name);
+    tf = ~exist(depDir, 'dir');
 end
 
 function tf = isDependencyUnloaded(dep)
-    depResult = mip.parse.parse_package_arg(dep);
-    if depResult.is_fqn
-        depFqn = dep;
-    else
-        depFqn = mip.resolve.resolve_bare_name(dep);
-    end
-    tf = isempty(depFqn) || ~mip.state.is_loaded(depFqn);
+    depFqn = mip.resolve.resolve_dependency(dep);
+    tf = ~mip.state.is_loaded(depFqn);
 end

@@ -149,8 +149,7 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
                 fqn, strjoin(deps, ', '));
         for i = 1:length(deps)
             dep = deps{i};
-            % Resolve dependency: same channel first, then core
-            depFqn = mip.resolve.resolve_dependency(dep, result.org, result.channel);
+            depFqn = mip.resolve.resolve_dependency(dep);
             if ~mip.state.is_loaded(depFqn)
                 loadSingle(depFqn, installIfMissing, false, channel, false, loadingStack);
             else
