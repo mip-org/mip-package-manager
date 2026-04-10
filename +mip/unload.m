@@ -59,14 +59,8 @@ function unload(varargin)
         % Execute unload_package.m if it exists
         executeUnload(packageDir, fqn);
 
-        % Remove from sticky packages
-        mip.state.key_value_remove('MIP_STICKY_PACKAGES', fqn);
-
-        % Remove from directly loaded packages
-        mip.state.key_value_remove('MIP_DIRECTLY_LOADED_PACKAGES', fqn);
-
-        % Remove from loaded packages
-        mip.state.key_value_remove('MIP_LOADED_PACKAGES', fqn);
+        % Remove from all load-state lists
+        mip.state.set_unloaded(fqn);
 
         fprintf('Unloaded package "%s"\n', fqn);
     end
