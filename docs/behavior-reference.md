@@ -127,16 +127,14 @@ Used by: `mip uninstall` (when given a bare name)
 2. If multiple installed packages match, **refuse** and print all matching FQNs, asking the user to disambiguate
 3. If none match, report "not installed"
 
-#### 2.4.4 Resolving a Dependency During Load (`resolveDependency` in `load.m`)
+#### 2.4.4 Resolving a Bare-Name Dependency (`resolve_dependency`)
 
-Used by: the load process when resolving bare-name dependencies listed in `mip.json`
+Used by: all contexts that resolve dependencies listed in `mip.json` — loading, pruning (unload/uninstall), and broken-dependency checks.
 
-Priority:
-1. If the dependency is a FQN, use as-is
-2. Try **same channel** as the parent package (check if directory exists)
-3. Try `mip-org/core/<name>` (check if directory exists)
-4. Fall back to general `resolve_bare_name` (which has its own priority)
-5. If nothing found, raise `mip:dependencyNotFound`
+- If the dependency is a FQN, use as-is
+- If bare name, **always** resolve to `mip-org/core/<name>`
+
+To depend on a package from a different channel, use the fully qualified name in `mip.yaml`.
 
 #### 2.4.5 Resolving a Dependency During Remote Install (`build_dependency_graph`)
 
@@ -145,17 +143,7 @@ Used by: the install process when building the dependency graph from channel ind
 - If the dependency is a FQN, use as-is
 - If bare name, **always** resolve to `mip-org/core/<name>`
 
-Note: this differs from load-time resolution (2.4.4) which tries the same channel first.
-
-#### 2.4.6 Resolving a Dependency During Prune (`getAllDependencies` in `unload.m` and `uninstall.m`)
-
-Used by: dependency pruning after unload or uninstall
-
-Priority:
-1. If the dependency is a FQN, use as-is
-2. Try same channel as the parent package (check if directory exists)
-3. Fall back to `resolve_bare_name`
-4. If not found, skip (do not error)
+This is consistent with the general dependency resolution rule (2.4.4).
 
 ### 2.5 Resolving a Package Name with Channel Context (`resolve_package_name`)
 
@@ -367,7 +355,7 @@ If `--install` is specified and the package is not installed, it is automaticall
 
 When loading a package with dependencies (listed in `mip.json`):
 
-1. Each dependency is resolved using same-channel-first resolution (section 2.4.4).
+1. Each dependency is resolved using `resolve_dependency` ([§2.4.4](#244-resolving-a-bare-name-dependency-resolve_dependency)): bare names always resolve to `mip-org/core/<name>`.
 2. Dependencies are loaded recursively before the package itself.
 3. Dependencies are loaded as **non-direct** (they won't appear in `MIP_DIRECTLY_LOADED_PACKAGES`).
 4. Dependencies are loaded as **non-sticky** (even if the parent was loaded with `--sticky`).
@@ -837,33 +825,7 @@ The `numbl_wasm` tag serves as a fallback architecture for all `numbl_*` platfor
 
 ## 14. Open Questions and Gaps
 
-This section collects unresolved design questions and untested behaviors. Items that were previously open but have since been resolved are documented in the relevant sections above (see issues [#95](https://github.com/mip-org/mip/issues/95), [#99](https://github.com/mip-org/mip/issues/99)--[#105](https://github.com/mip-org/mip/issues/105)).
-
-### 14.1 Inconsistent Bare-Name Dependency Resolution
-
-Bare-name dependencies are resolved differently depending on context:
-
-- **Install** ([§2.4.5](#245-resolving-a-dependency-during-remote-install-build_dependency_graph)): always `mip-org/core/<name>`
-- **Load** ([§2.4.4](#244-resolving-a-dependency-during-load-resolvedependency-in-loadm)): same channel first, then `mip-org/core`
-- **Prune** ([§2.4.6](#246-resolving-a-dependency-during-prune-getalldependencies-in-unloadm-and-uninstallm)): same channel first, then general resolution
-
-This means a package's dependencies could be installed from one channel but loaded from another. Additionally, `mip.json` stores dependency names as-is from `mip.yaml` (which may be bare names), so the resolution happens fresh at load time and prune time rather than being fixed at install time.
-
-A possible fix: resolve bare-name dependencies to FQNs at install time and store the resolved FQNs in `mip.json`.
-
-**Untested.**
-
-### 14.2 Local Install Dependency Check Is Incomplete
-
-Local install ([§3.2.4](#324-dependency-validation-for-local-install)) resolves bare-name dependencies only to `mip-org/core/<name>`. A dependency installed on a different channel (e.g., `mylab/custom/dep`) would be missed even though it is present. Should use `resolve_bare_name` instead.
-
-**Untested.**
-
-### 14.3 Pruning May Disagree With Install About Dependency Channels
-
-Pruning uses same-channel-first resolution for bare-name dependencies ([§2.4.6](#246-resolving-a-dependency-during-prune-getalldependencies-in-unloadm-and-uninstallm)), but install always resolves to `mip-org/core` ([§2.4.5](#245-resolving-a-dependency-during-remote-install-build_dependency_graph)). If you later install the same-named package on another channel, pruning might resolve to the new one and incorrectly orphan the original. Related to [§14.1](#141-inconsistent-bare-name-dependency-resolution).
-
-**Untested.**
+This section collects unresolved design questions and untested behaviors. Items that were previously open but have since been resolved are documented in the relevant sections above (see issues [#94](https://github.com/mip-org/mip/issues/94), [#95](https://github.com/mip-org/mip/issues/95), [#99](https://github.com/mip-org/mip/issues/99)--[#105](https://github.com/mip-org/mip/issues/105)).
 
 ### 14.4 No Lock File
 
@@ -887,9 +849,6 @@ Running multiple MATLAB sessions that share the same `~/.mip` directory is **not
 
 Behaviors specified in this document but not covered by tests:
 
-- Bare-name dependency resolution inconsistency between install, load, and prune ([§14.1](#141-inconsistent-bare-name-dependency-resolution))
-- Local install dependency check for non-core channels ([§14.2](#142-local-install-dependency-check-is-incomplete))
-- Pruning disagreement with install about dependency channels ([§14.3](#143-pruning-may-disagree-with-install-about-dependency-channels))
 - `mip load --install` with `--channel` ([§14.6](#146-mip-load---install-channel-handling))
 - `mip install` from URL (`https://...`)
 - `mip avail` ([§9.3](#93-mip-avail)), `mip info` remote-only display with `--channel`

@@ -69,6 +69,31 @@ classdef TestPackageDiscovery < matlab.unittest.TestCase
             testCase.verifyEqual(fqn, 'local/local/devpkg');
         end
 
+        %% resolve_dependency tests
+
+        function testResolveDependency_FqnPassthrough(testCase)
+            fqn = mip.resolve.resolve_dependency('mip-org/core/chebfun');
+            testCase.verifyEqual(fqn, 'mip-org/core/chebfun');
+        end
+
+        function testResolveDependency_BareNameResolvesToCore(testCase)
+            fqn = mip.resolve.resolve_dependency('chebfun');
+            testCase.verifyEqual(fqn, 'mip-org/core/chebfun');
+        end
+
+        function testResolveDependency_BareNameIgnoresSameChannel(testCase)
+            % Even when a package with the same name exists on a non-core
+            % channel, bare-name deps always resolve to mip-org/core.
+            createTestPackage(testCase.TestRoot, 'mylab', 'custom', 'somepkg');
+            fqn = mip.resolve.resolve_dependency('somepkg');
+            testCase.verifyEqual(fqn, 'mip-org/core/somepkg');
+        end
+
+        function testResolveDependency_NonCoreFqnPreserved(testCase)
+            fqn = mip.resolve.resolve_dependency('mylab/custom/somepkg');
+            testCase.verifyEqual(fqn, 'mylab/custom/somepkg');
+        end
+
         %% list_installed_packages tests
 
         function testListInstalled_EmptyDir(testCase)

@@ -2,8 +2,7 @@ function deps = get_all_dependencies(fqn)
 %GET_ALL_DEPENDENCIES   Recursively collect all transitive dependencies of an installed package.
 %
 % Reads mip.json from the installed package directory and resolves bare
-% dependency names using same-channel-first, then mip-org/core, then
-% general resolution.
+% dependency names to mip-org/core/<name>.
 %
 % Args:
 %   fqn - Fully qualified package name (org/channel/name)
@@ -39,7 +38,7 @@ try
     for i = 1:length(depNames)
         dep = depNames{i};
         try
-            depFqn = mip.resolve.resolve_dependency(dep, result.org, result.channel);
+            depFqn = mip.resolve.resolve_dependency(dep);
         catch
             continue
         end
