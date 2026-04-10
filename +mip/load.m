@@ -18,10 +18,12 @@ function load(varargin)
 %   --sticky      Mark the package(s) as sticky (prevents unload with 'mip unload --all')
 %   --install     Automatically install the package(s) if not already installed
 %   --channel <c> Channel to install from when using --install (e.g. 'mip-org/staging')
+%   --transitive  (internal) Load as a transitive dependency, not a direct load
 
     % Parse flags and package names from arguments
     installIfMissing = false;
     stickyPackage = false;
+    isDirect = true;
     channel = '';
     packageArgs = {};
     i = 1;
@@ -31,6 +33,8 @@ function load(varargin)
             installIfMissing = true;
         elseif ischar(arg) && strcmp(arg, '--sticky')
             stickyPackage = true;
+        elseif ischar(arg) && strcmp(arg, '--transitive')
+            isDirect = false;
         elseif ischar(arg) && strcmp(arg, '--channel')
             if i < length(varargin)
                 i = i + 1;
@@ -50,7 +54,7 @@ function load(varargin)
 
     % Load each package
     for i = 1:length(packageArgs)
-        loadSingle(packageArgs{i}, installIfMissing, stickyPackage, channel, true, {});
+        loadSingle(packageArgs{i}, installIfMissing, stickyPackage, channel, isDirect, {});
     end
 end
 

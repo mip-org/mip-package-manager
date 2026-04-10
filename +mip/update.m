@@ -105,9 +105,7 @@ function update(varargin)
     end
 
     % Snapshot currently-loaded state so we can restore it after the
-    % update cycle. We remember both the full loaded list (so transitive
-    % deps that get pruned can be re-loaded) and the directly-loaded
-    % list (so we can preserve the direct-vs-transitive distinction).
+    % update cycle.
     loadedBefore = mip.state.key_value_get('MIP_LOADED_PACKAGES');
     directlyLoadedBefore = mip.state.key_value_get('MIP_DIRECTLY_LOADED_PACKAGES');
 
@@ -225,37 +223,22 @@ function tf = checkRemoteNeedsUpdate(p)
     end
 
     latestInfo = packageInfoMap(fqn);
-    latestVersion = latestInfo.version;
 
-    if strcmp(installedVersion, latestVersion)
-        installedHash = '';
-        if isfield(p.pkgInfo, 'commit_hash')
-            installedHash = p.pkgInfo.commit_hash;
-        end
-        latestHash = '';
-        if isfield(latestInfo, 'commit_hash')
-            latestHash = latestInfo.commit_hash;
-        end
-
-        if isempty(latestHash) || strcmp(installedHash, latestHash)
-            fprintf('Package "%s" is already up to date (%s)\n', fqn, installedVersion);
-            tf = false;
-            return
-        end
-
-        fprintf('Version is "%s" but commit hash has changed (%s -> %s)\n', ...
-                installedVersion, installedHash, latestHash);
+    if ~mip.state.check_needs_update(p.pkgInfo, latestInfo)
+        fprintf('Package "%s" is already up to date (%s)\n', fqn, installedVersion);
+        tf = false;
+        return
     end
 
-    fprintf('Updating "%s": %s -> %s\n', fqn, installedVersion, latestVersion);
+    fprintf('Updating "%s": %s -> %s\n', fqn, installedVersion, latestInfo.version);
     tf = true;
 end
 
 function reloadPreviouslyLoaded(loadedBefore, directlyLoadedBefore)
 % Reload any packages that were loaded before the update but are no
-% longer loaded. Preserves the direct-vs-transitive loaded distinction
-% by resetting MIP_DIRECTLY_LOADED_PACKAGES to the pre-update snapshot
-% at the end (filtered to entries that are actually loaded now).
+% longer loaded. Uses --transitive for packages that were not directly
+% loaded, preserving the direct-vs-transitive distinction without
+% needing a post-fixup pass.
 
     if isempty(loadedBefore)
         return
@@ -276,23 +259,12 @@ function reloadPreviouslyLoaded(loadedBefore, directlyLoadedBefore)
             continue
         end
         fprintf('Reloading "%s"...\n', pkg);
-        mip.load(pkg);
-    end
-
-    % Restore the directly-loaded snapshot. The bulk reload above may
-    % have marked formerly-transitively-loaded packages as directly
-    % loaded (since mip.load is always a direct call). Reset the state
-    % so only the packages that were directly loaded before -- and that
-    % are still loaded now -- are marked as directly loaded.
-    currentlyLoaded = mip.state.key_value_get('MIP_LOADED_PACKAGES');
-    desiredDirectly = {};
-    for i = 1:length(directlyLoadedBefore)
-        pkg = directlyLoadedBefore{i};
-        if ismember(pkg, currentlyLoaded)
-            desiredDirectly{end+1} = pkg; %#ok<AGROW>
+        if ismember(pkg, directlyLoadedBefore)
+            mip.load(pkg);
+        else
+            mip.load(pkg, '--transitive');
         end
     end
-    mip.state.key_value_set('MIP_DIRECTLY_LOADED_PACKAGES', desiredDirectly);
 end
 
 function updateSelf(p, force)
@@ -316,27 +288,13 @@ function updateSelf(p, force)
     end
 
     latestInfo = packageInfoMap(fqn);
-    latestVersion = latestInfo.version;
 
-    if ~force
-        if strcmp(installedVersion, latestVersion)
-            installedHash = '';
-            if isfield(pkgInfo, 'commit_hash')
-                installedHash = pkgInfo.commit_hash;
-            end
-            latestHash = '';
-            if isfield(latestInfo, 'commit_hash')
-                latestHash = latestInfo.commit_hash;
-            end
-
-            if isempty(latestHash) || strcmp(installedHash, latestHash)
-                fprintf('mip is already up to date (%s)\n', installedVersion);
-                return
-            end
-        end
+    if ~force && ~mip.state.check_needs_update(pkgInfo, latestInfo)
+        fprintf('mip is already up to date (%s)\n', installedVersion);
+        return
     end
 
-    fprintf('Updating mip: %s -> %s\n', installedVersion, latestVersion);
+    fprintf('Updating mip: %s -> %s\n', installedVersion, latestInfo.version);
 
     tempDir = tempname;
     mkdir(tempDir);
