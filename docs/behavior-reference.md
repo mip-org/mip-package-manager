@@ -881,9 +881,7 @@ When multiple loaded packages share a bare name, `mip unload <bare>` unloads the
 
 ### 14.7 Concurrent MATLAB Sessions
 
-In-memory state (`setappdata`) is per-session. File state (`directly_installed.txt`) is shared with no file locking. Concurrent sessions could corrupt the file.
-
-**Untested.**
+Running multiple MATLAB sessions that share the same `~/.mip` directory is **not supported**. In-memory state (`setappdata`) is per-session, while file state (`directly_installed.txt`, installed packages on disk) is shared with no file locking. Concurrent `mip install`/`mip uninstall` operations can race on `directly_installed.txt` (read-modify-write without locking) and one session's `mip uninstall` can remove packages another session has loaded. Users should avoid running `mip` commands that modify state from multiple sessions simultaneously.
 
 ### 14.8 Missing Test Coverage
 
