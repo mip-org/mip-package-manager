@@ -454,12 +454,11 @@ After unloading (and pruning), the system checks all still-loaded packages. If a
    - FQN arguments: used directly.
    - Bare names: uses `find_all_installed_by_name` (section 2.4.3). If ambiguous, refuses.
 2. Filter out `mip-org/core/mip` (prints manual uninstall instructions).
-3. **Require confirmation** via interactive `input()` prompt. User must type `y` or `yes`.
-4. Unload any packages that are currently loaded.
-5. Remove each package directory (`rmdir`).
-6. Remove from `directly_installed.txt`.
-7. Clean up empty parent directories (channel dir, then org dir).
-8. **Prune** packages that are no longer needed.
+3. Unload any packages that are currently loaded.
+4. Remove each package directory (`rmdir`).
+5. Remove from `directly_installed.txt`.
+6. Clean up empty parent directories (channel dir, then org dir).
+7. **Prune** packages that are no longer needed.
 
 ### 6.2 Dependency Pruning After Uninstall
 
