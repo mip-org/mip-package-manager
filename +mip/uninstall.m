@@ -148,23 +148,25 @@ function didUninstall = uninstallSelf()
     % Cache the user's current path
     current_path = path;
 
-    % Change the path to match what it would be if MATLAB had just started up
-    path(pathdef);
+    try
+        % Change the path to match what it would be if MATLAB had just started up
+        path(pathdef);
 
-    % Remove <MIP_ROOT>/packages/mip-org/core/mip/mip from the path and save it
-    % for future MATLAB sessions
-    w = warning('off', 'MATLAB:rmpath:DirNotFound');
-    rmpath(mipSourceDir);
-    warning(w);
-    savepath();
+        % Remove <MIP_ROOT>/packages/mip-org/core/mip/mip from the path and save it
+        % for future MATLAB sessions
+        rmpath_safe(mipSourceDir);
+        savepath();
+    catch ME
+        % Restore the user's path if anything goes wrong
+        path(current_path);
+        rethrow(ME);
+    end
 
     % Restore the path to what it was before and remove
     % <MIP_ROOT>/packages/mip-org/core/mip/mip from the path for the current
     % MATLAB session
     path(current_path);
-    w = warning('off', 'MATLAB:rmpath:DirNotFound');
-    rmpath(mipSourceDir);
-    warning(w);
+    rmpath_safe(mipSourceDir);
 
     % Delete the mip root directory
     fprintf('Deleting %s...\n', shorten_home(mipRoot));
@@ -174,8 +176,14 @@ function didUninstall = uninstallSelf()
     fprintf('   eval(webread(''https://mip.sh/install.txt''))\n\n');
 end
 
-function p = shorten_home(p)
+function rmpath_safe(d)
+    w = warning('off', 'MATLAB:rmpath:DirNotFound');
+    rmpath(d);
+    warning(w);
+end
+
+function d = shorten_home(d)
     if ~(ispc || isempty(getenv('HOME')))
-        p = replace(p, getenv('HOME'), '~');
+        d = replace(d, getenv('HOME'), '~');
     end
 end
