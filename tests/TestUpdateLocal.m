@@ -317,6 +317,8 @@ classdef TestUpdateLocal < matlab.unittest.TestCase
         function testUpdate_BatchFailureReloadsEarlierPackages(testCase)
             % When updating pkgA and pkgB, if pkgB fails, pkgA should
             % still be reloaded (not left unloaded).
+            % Local packages are processed in argument order, so pkgA
+            % (listed first) succeeds before pkgB fails.
             srcA = createTestSourcePackage(testCase.SourceDir, 'pkgA');
             srcB = createTestSourcePackage(testCase.SourceDir, 'pkgB');
             mip.install(srcA);
@@ -337,6 +339,31 @@ classdef TestUpdateLocal < matlab.unittest.TestCase
 
             testCase.verifyTrue(mip.state.is_loaded('local/local/pkgA'), ...
                 'pkgA should be reloaded even though pkgB failed');
+        end
+
+        function testUpdate_BatchFailureReloadsLaterPackages(testCase)
+            % Reverse ordering: pkgA fails first, pkgB (listed second)
+            % should still be reloaded.
+            srcA = createTestSourcePackage(testCase.SourceDir, 'pkgA');
+            srcB = createTestSourcePackage(testCase.SourceDir, 'pkgB');
+            mip.install(srcA);
+            mip.install(srcB);
+
+            mip.load('local/local/pkgA');
+            mip.load('local/local/pkgB');
+            testCase.verifyTrue(mip.state.is_loaded('local/local/pkgA'));
+            testCase.verifyTrue(mip.state.is_loaded('local/local/pkgB'));
+
+            % Break pkgA's source so its update fails
+            delete(fullfile(srcA, 'mip.yaml'));
+
+            % Update both — pkgA fails first but pkgB should still reload
+            testCase.verifyError( ...
+                @() mip.update('local/local/pkgA', 'local/local/pkgB'), ...
+                'mip:mipYamlNotFound');
+
+            testCase.verifyTrue(mip.state.is_loaded('local/local/pkgB'), ...
+                'pkgB should be reloaded even though pkgA failed');
         end
 
     end
