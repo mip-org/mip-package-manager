@@ -28,36 +28,35 @@ if ~iscell(builds)
 end
 
 % Pass 1: exact architecture match
-for i = 1:length(builds)
-    b = builds{i};
-    archs = b.architectures;
-    if ~iscell(archs)
-        archs = {archs};
-    end
-
-    if ismember(architecture, archs)
-        buildEntry = b;
-        effectiveArch = architecture;
-        return;
-    end
+effectiveArch = architecture;
+buildEntry = findFirstMatchingBuild(builds, effectiveArch);
+if ~isempty(buildEntry)
+    return
 end
 
 % Pass 2: fall back to first 'any' build
-for i = 1:length(builds)
-    b = builds{i};
-    archs = b.architectures;
-    if ~iscell(archs)
-        archs = {archs};
-    end
-
-    if ismember('any', archs)
-        buildEntry = b;
-        effectiveArch = 'any';
-        return;
-    end
+effectiveArch = 'any';
+buildEntry = findFirstMatchingBuild(builds, effectiveArch);
+if ~isempty(buildEntry)
+    return
 end
 
 error('mip:noMatchingBuild', ...
       'No build in mip.yaml matches architecture "%s"', architecture);
 
+end
+
+function buildEntry = findFirstMatchingBuild(builds, arch)
+    buildEntry = [];
+    for i = 1:length(builds)
+        b = builds{i};
+        archs = b.architectures;
+        if ~iscell(archs)
+            archs = {archs};
+        end
+        if ismember(arch, archs)
+            buildEntry = b;
+            return
+        end
+    end
 end
