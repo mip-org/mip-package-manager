@@ -31,7 +31,8 @@ fprintf(fid, '    %% %s package directories to/from MATLAB path\n', verb);
 
 if useAbsolute
     for i = 1:length(paths)
-        fprintf(fid, '    %s(''%s'');\n', pathFn, paths{i});
+        escaped = strrep(paths{i}, '''', '''''');
+        fprintf(fid, '    %s(''%s'');\n', pathFn, escaped);
     end
 else
     fprintf(fid, '    pkg_dir = fileparts(mfilename(''fullpath''));\n');
@@ -39,7 +40,8 @@ else
         if strcmp(paths{i}, '.')
             fprintf(fid, '    %s(pkg_dir);\n', pathFn);
         else
-            fprintf(fid, '    %s(fullfile(pkg_dir, ''%s''));\n', pathFn, paths{i});
+            escaped = strrep(paths{i}, '''', '''''');
+            fprintf(fid, '    %s(fullfile(pkg_dir, ''%s''));\n', pathFn, escaped);
         end
     end
 end
