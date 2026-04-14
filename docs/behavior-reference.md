@@ -561,6 +561,16 @@ To update a dependency, name it explicitly (`mip update dep`) or use `--deps` to
 
 The `directly_installed.txt` entry for each updated package is preserved across the update (the entry is never removed). Missing dependencies installed during the update are **not** added to `directly_installed.txt` — they remain transitive dependencies.
 
+### 7.8 Build Matching (`match_build`)
+
+When installing or compiling a package, MIP selects a build entry from the `builds` array in `mip.yaml` using a two-pass scan:
+
+1. **Pass 1 — exact match**: scan all build entries in order; return the first whose `architectures` list contains the current architecture string.
+2. **Pass 2 — `any` fallback**: scan all build entries again; return the first whose `architectures` list contains `any`.
+3. If neither pass finds a match, raises `mip:noMatchingBuild`.
+
+This guarantees an exact architecture match is always preferred over `any`, regardless of declaration order in `mip.yaml`.
+
 ---
 
 ## 8. Compilation
