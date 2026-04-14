@@ -6,10 +6,14 @@ function update(varargin)
 %   mip.update('org/channel/packageName')
 %   mip.update('package1', 'package2')
 %   mip.update('--force', 'packageName')
+%   mip.update('--deps', 'packageName')
+%   mip.update('--all')
 %   mip.update('mip')
 %
 % Options:
 %   --force           Force update even if already up to date
+%   --all             Update all installed packages
+%   --deps            Also update the dependencies of the named packages
 %
 % For each requested package, checks whether an update is needed. For
 % remote packages, the installed version (and commit hash) is compared
@@ -19,10 +23,11 @@ function update(varargin)
 %
 % Remote packages are updated via staging: the new version is downloaded
 % to a temporary directory first, then the old directory is replaced only
-% after the download succeeds. Existing dependencies are not updated.
-% After the update, any new dependencies that the updated package requires
-% are installed, and any orphaned packages (old dependencies no longer
-% needed by any directly installed package) are pruned.
+% after the download succeeds. Existing dependencies are not updated
+% (unless --deps is specified). After the update, any missing dependencies
+% that the updated package requires are installed, and any orphaned
+% packages (old dependencies no longer needed by any directly installed
+% package) are pruned.
 %
 % Local packages are reinstalled from their source path without going
 % through uninstall (since install_local cannot re-fetch deps from a
@@ -36,20 +41,45 @@ function update(varargin)
         error('mip:update:noPackage', 'At least one package name is required for update command.');
     end
 
-    % Check for --force flag
+    % Check for --force, --all, and --deps flags
     force = false;
+    updateAll = false;
+    updateDeps = false;
     args = {};
     for i = 1:length(varargin)
         arg = varargin{i};
         if ischar(arg) && strcmp(arg, '--force')
             force = true;
+        elseif ischar(arg) && strcmp(arg, '--all')
+            updateAll = true;
+        elseif ischar(arg) && strcmp(arg, '--deps')
+            updateDeps = true;
         else
             args{end+1} = arg; %#ok<AGROW>
         end
     end
 
+    % --all: update all installed packages
+    if updateAll
+        if ~isempty(args)
+            error('mip:update:allWithPackages', ...
+                  'Cannot specify package names with --all.');
+        end
+        allInstalled = mip.state.list_installed_packages();
+        if isempty(allInstalled)
+            fprintf('No packages installed.\n');
+            return
+        end
+        args = allInstalled;
+    end
+
     if isempty(args)
         error('mip:update:noPackage', 'At least one package name is required for update command.');
+    end
+
+    % --deps: expand the argument list with each package's dependencies
+    if updateDeps
+        args = expandWithDeps(args);
     end
 
     % Resolve and validate each argument. Any error here (not installed,
@@ -110,71 +140,85 @@ function update(varargin)
     loadedBefore = mip.state.key_value_get('MIP_LOADED_PACKAGES');
     directlyLoadedBefore = mip.state.key_value_get('MIP_DIRECTLY_LOADED_PACKAGES');
 
-    % --- Local packages: backup + install_local (no mip.uninstall) ---
-    % Local packages cannot go through mip.uninstall because that prunes
-    % orphaned deps, and install_local cannot re-fetch them from a channel.
-    % The old package is moved to a backup directory before reinstalling so
-    % that a failure in install_local does not destroy the installed copy.
-    for i = 1:length(localPkgs)
-        p = localPkgs{i};
-        fprintf('Updating local package "%s"...\n', p.fqn);
+    % Wrap the update loops in try-catch so that reloadPreviouslyLoaded
+    % always runs. Without this, a failure mid-batch would leave
+    % already-updated packages unloaded for the rest of the session.
+    updateError = [];
+    try
+        % --- Local packages: backup + install_local (no mip.uninstall) ---
+        % Local packages cannot go through mip.uninstall because that prunes
+        % orphaned deps, and install_local cannot re-fetch them from a channel.
+        % The old package is moved to a backup directory before reinstalling so
+        % that a failure in install_local does not destroy the installed copy.
+        for i = 1:length(localPkgs)
+            p = localPkgs{i};
+            fprintf('Updating local package "%s"...\n', p.fqn);
 
-        if mip.state.is_loaded(p.fqn)
-            fprintf('Unloading "%s" before update...\n', p.fqn);
-            mip.unload(p.fqn);
-        end
-
-        % Move old package to backup before reinstalling
-        backupDir = [tempname '_mip_backup'];
-        movefile(p.pkgDir, backupDir);
-        mip.state.remove_directly_installed(p.fqn);
-        packagesDir = mip.paths.get_packages_dir();
-        mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'local', 'local'));
-        mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'local'));
-
-        fprintf('Reinstalling "%s" from %s...\n', p.fqn, p.sourcePath);
-        try
-            mip.build.install_local(p.sourcePath, p.editable);
-        catch ME
-            % Restore old package on failure
-            parentDir = fileparts(p.pkgDir);
-            if ~exist(parentDir, 'dir')
-                mkdir(parentDir);
-            end
-            movefile(backupDir, p.pkgDir);
-            mip.state.add_directly_installed(p.fqn);
-            rethrow(ME);
-        end
-        if exist(backupDir, 'dir')
-            rmdir(backupDir, 's');
-        end
-    end
-
-    % --- Remote packages: update in place, install new deps, prune ---
-    % Each package is replaced on disk with the latest version from the
-    % channel. Existing dependencies are left alone. After all packages are
-    % updated, any new dependencies are installed and orphaned packages are
-    % pruned.
-    if ~isempty(remotePkgs)
-        for i = 1:length(remotePkgs)
-            p = remotePkgs{i};
             if mip.state.is_loaded(p.fqn)
                 fprintf('Unloading "%s" before update...\n', p.fqn);
                 mip.unload(p.fqn);
             end
-            downloadAndReplace(p);
+
+            % Move old package to backup before reinstalling
+            backupDir = [tempname '_mip_backup'];
+            movefile(p.pkgDir, backupDir);
+            mip.state.remove_directly_installed(p.fqn);
+            packagesDir = mip.paths.get_packages_dir();
+            mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'local', 'local'));
+            mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'local'));
+
+            fprintf('Reinstalling "%s" from %s...\n', p.fqn, p.sourcePath);
+            try
+                mip.build.install_local(p.sourcePath, p.editable);
+            catch ME
+                % Restore old package on failure
+                parentDir = fileparts(p.pkgDir);
+                if ~exist(parentDir, 'dir')
+                    mkdir(parentDir);
+                end
+                movefile(backupDir, p.pkgDir);
+                mip.state.add_directly_installed(p.fqn);
+                rethrow(ME);
+            end
+            if exist(backupDir, 'dir')
+                rmdir(backupDir, 's');
+            end
         end
 
-        % Install any new dependencies that the updated packages require
-        remoteFqns = cellfun(@(p) p.fqn, remotePkgs, 'UniformOutput', false);
-        installMissingDeps(remoteFqns);
+        % --- Remote packages: update via staging, install missing deps, prune ---
+        % Each package is replaced on disk with the latest version from the
+        % channel. Existing dependencies are left alone. After all packages are
+        % updated, any missing dependencies are installed and orphaned packages
+        % are pruned.
+        if ~isempty(remotePkgs)
+            for i = 1:length(remotePkgs)
+                p = remotePkgs{i};
+                if mip.state.is_loaded(p.fqn)
+                    fprintf('Unloading "%s" before update...\n', p.fqn);
+                    mip.unload(p.fqn);
+                end
+                downloadAndReplace(p);
+            end
 
-        % Prune packages that are no longer needed
-        mip.state.prune_unused_packages();
+            % Install any missing dependencies that the updated packages require
+            remoteFqns = cellfun(@(p) p.fqn, remotePkgs, 'UniformOutput', false);
+            installMissingDeps(remoteFqns);
+
+            % Prune packages that are no longer needed
+            mip.state.prune_unused_packages();
+        end
+    catch ME
+        updateError = ME;
     end
 
     % Reload anything that was loaded before update but isn't now.
+    % This runs even after a partial failure so that successfully-updated
+    % packages are not left unloaded.
     reloadPreviouslyLoaded(loadedBefore, directlyLoadedBefore);
+
+    if ~isempty(updateError)
+        rethrow(updateError);
+    end
 end
 
 function p = resolvePackage(packageArg)
@@ -341,10 +385,11 @@ function installMissingDeps(remoteFqns)
         return
     end
 
-    fprintf('\nInstalling new dependencies: %s\n', strjoin(missingDeps, ', '));
+    fprintf('\nInstalling missing dependencies: %s\n', strjoin(missingDeps, ', '));
 
     % Record which packages are directly installed before calling mip.install
-    % so we can undo any additions (new deps should not be directly installed).
+    % so we can undo any additions (missing deps should not be directly
+    % installed).
     directBefore = mip.state.get_directly_installed();
 
     mip.install(missingDeps{:});
@@ -451,3 +496,24 @@ function updateSelf(p, force)
     fprintf('\nmip has been updated to %s.\n', latestInfo.version);
 end
 
+function expanded = expandWithDeps(args)
+% Expand a list of package arguments to include their installed
+% dependencies (recursively). The original packages come first, followed
+% by any dependencies not already in the list.
+
+    expanded = args;
+    for i = 1:length(args)
+        r = mip.resolve.resolve_to_installed(args{i});
+        if isempty(r)
+            % Not installed — will error later in resolvePackage; skip here
+            continue
+        end
+        deps = mip.resolve.get_all_dependencies(r.fqn);
+        for j = 1:length(deps)
+            isInstalled = ~isempty(mip.resolve.resolve_to_installed(deps{j}));
+            if isInstalled && ~any(strcmp(expanded, deps{j}))
+                expanded{end+1} = deps{j}; %#ok<AGROW>
+            end
+        end
+    end
+end
