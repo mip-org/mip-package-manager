@@ -13,12 +13,16 @@ function install(varargin)
 %   mip.install('.', '--editable')                  - Editable install (like pip -e)
 %   mip.install('-e', '/path/to/package')           - Editable install (short form)
 %   mip.install('-e', '.', '--no-compile')          - Editable install, skip compilation
+%   mip.install('https://example.com/pkg.zip', '--name', 'mypkg')
+%                                                    - Install from a remote .zip URL
 %
 % Options:
 %   --channel <name>    Install from a specific channel (default: mip-org/core)
 %                       Format: 'org/channel' (e.g. 'mip-org/core')
 %   --editable, -e      Install in editable mode (local packages only)
 %   --no-compile        Skip compilation (editable installs only)
+%   --name <name>       Required for .zip URL installs (used as the package
+%                       name when auto-generating a mip.yaml).
 %
 % Local packages:
 %   To install a local directory, the path must start with '~', '.', '/',
@@ -39,18 +43,29 @@ function install(varargin)
         error('mip:install:noPackage', 'At least one package name is required for install command.');
     end
 
-    % Check for --editable / -e and --no-compile flags
+    % Check for --editable / -e, --no-compile, and --name flags
     editable = false;
     noCompile = false;
+    zipName = '';
     filteredArgs = {};
-    for i = 1:length(varargin)
+    i = 1;
+    while i <= length(varargin)
         arg = varargin{i};
         if ischar(arg) && (strcmp(arg, '--editable') || strcmp(arg, '-e'))
             editable = true;
+            i = i + 1;
         elseif ischar(arg) && strcmp(arg, '--no-compile')
             noCompile = true;
+            i = i + 1;
+        elseif ischar(arg) && strcmp(arg, '--name')
+            if i + 1 > length(varargin)
+                error('mip:install:missingNameValue', '--name requires a value.');
+            end
+            zipName = varargin{i + 1};
+            i = i + 2;
         else
             filteredArgs{end+1} = arg; %#ok<AGROW>
+            i = i + 1;
         end
     end
 
@@ -66,15 +81,19 @@ function install(varargin)
     end
 
     % Categorize each argument by how it should be installed:
-    %   - mhl source   (.mhl file or http(s) URL)
+    %   - zip url      (http(s) URL whose path ends in .zip)
+    %   - mhl source   (.mhl file or other http(s) URL)
     %   - local path   (starts with ~, ., /, or a Windows drive letter)
     %   - repo package (bare name or org/channel/package FQN)
     mhlSources = {};
     localPaths = {};
     repoPackages = {};
+    zipUrls = {};
     for i = 1:length(args)
         pkg = char(args{i});
-        if endsWith(pkg, '.mhl') || startsWith(pkg, 'http://') || startsWith(pkg, 'https://')
+        if isZipUrlArg(pkg)
+            zipUrls{end+1} = pkg; %#ok<AGROW>
+        elseif endsWith(pkg, '.mhl') || startsWith(pkg, 'http://') || startsWith(pkg, 'https://')
             mhlSources{end+1} = pkg; %#ok<AGROW>
         elseif isLocalPathArg(pkg)
             localPaths{end+1} = pkg; %#ok<AGROW>
@@ -92,8 +111,34 @@ function install(varargin)
     end
 
     if editable && isempty(localPaths)
+        if ~isempty(zipUrls)
+            error('mip:install:editableRequiresLocal', ...
+                  '--editable cannot be used with .zip URL installs.');
+        end
         error('mip:install:editableRequiresLocal', ...
               '--editable can only be used with local directory packages.');
+    end
+
+    % --name validation: required for .zip URLs, only valid for .zip URLs,
+    % and a single --name cannot disambiguate multiple zip URLs.
+    if ~isempty(zipName) && isempty(zipUrls)
+        error('mip:install:nameRequiresZipUrl', ...
+              '--name is only valid when installing from a .zip URL.');
+    end
+    if ~isempty(zipUrls) && isempty(zipName)
+        error('mip:install:nameRequiredForZipUrl', ...
+              ['--name <packagename> is required when installing from a .zip URL. ' ...
+               'Example: mip install %s --name mypkg'], zipUrls{1});
+    end
+    if length(zipUrls) > 1
+        error('mip:install:multipleZipUrls', ...
+              ['Only one .zip URL can be installed per command (--name applies ' ...
+               'to a single package). Found %d.'], length(zipUrls));
+    end
+
+    % Process .zip URL installs (download, extract, auto-init, install_local)
+    for i = 1:length(zipUrls)
+        installFromZipUrl(zipUrls{i}, zipName, noCompile);
     end
 
     % Process local directory installs first
@@ -117,7 +162,7 @@ function install(varargin)
         mip.build.install_local(localPath, editable, noCompile);
     end
 
-    % If only local installs were requested, we're done
+    % If only local / zip-url installs were requested, we're done
     if isempty(repoPackages) && isempty(mhlSources)
         return;
     end
@@ -506,6 +551,84 @@ end
 function rmTempDir(d)
     if exist(d, 'dir')
         rmdir(d, 's');
+    end
+end
+
+function tf = isZipUrlArg(pkg)
+% Return true if pkg is an http(s) URL whose path component ends in .zip
+% (case-insensitive). The path component is everything before the first
+% '?' (query) or '#' (fragment).
+    if ~startsWith(pkg, 'http://') && ~startsWith(pkg, 'https://')
+        tf = false;
+        return
+    end
+    pathPart = pkg;
+    qIdx = strfind(pathPart, '?');
+    if ~isempty(qIdx)
+        pathPart = pathPart(1:qIdx(1)-1);
+    end
+    hIdx = strfind(pathPart, '#');
+    if ~isempty(hIdx)
+        pathPart = pathPart(1:hIdx(1)-1);
+    end
+    tf = endsWith(lower(pathPart), '.zip');
+end
+
+function installFromZipUrl(zipUrl, pkgName, noCompile)
+% Download a .zip from a URL, extract it, auto-init a mip.yaml if missing,
+% then run a local non-editable install. The temp directory is cleaned up
+% on both success and failure.
+%
+% pkgName is the name to use for the auto-generated mip.yaml (already
+% validated by the caller as non-empty). If the zip already contains a
+% mip.yaml, pkgName is ignored and the existing mip.yaml is used.
+
+    tempDir = tempname;
+    mkdir(tempDir);
+    cleanupTemp = onCleanup(@() rmTempDir(tempDir));
+
+    fprintf('Downloading %s...\n', zipUrl);
+    zipPath = fullfile(tempDir, 'package.zip');
+    try
+        websave(zipPath, zipUrl, weboptions('Timeout', 300));
+    catch ME
+        error('mip:install:zipDownloadFailed', ...
+              'Failed to download %s: %s', zipUrl, ME.message);
+    end
+
+    extractRoot = fullfile(tempDir, 'extracted');
+    mkdir(extractRoot);
+    fprintf('Extracting...\n');
+    try
+        unzip(zipPath, extractRoot);
+    catch ME
+        error('mip:install:zipExtractFailed', ...
+              'Failed to extract %s: %s', zipUrl, ME.message);
+    end
+
+    % If the zip extracted to a single top-level directory (e.g. GitHub
+    % archive zips produce a `<repo>-<branch>/` wrapper), descend into
+    % it. Otherwise use the extraction root directly.
+    sourceDir = unwrapSingleSubdir(extractRoot);
+
+    if ~isfile(fullfile(sourceDir, 'mip.yaml'))
+        fprintf('No mip.yaml found in archive; auto-generating...\n');
+        mip.init(sourceDir, '--name', pkgName, '--repository', zipUrl);
+        fprintf('\n');
+    end
+
+    mip.build.install_local(sourceDir, false, noCompile);
+end
+
+function dir2 = unwrapSingleSubdir(d)
+% If d contains exactly one entry and it is a directory, return that
+% subdirectory. Otherwise return d unchanged.
+    entries = dir(d);
+    entries = entries(~ismember({entries.name}, {'.', '..'}));
+    if isscalar(entries) && entries(1).isdir
+        dir2 = fullfile(d, entries(1).name);
+    else
+        dir2 = d;
     end
 end
 
