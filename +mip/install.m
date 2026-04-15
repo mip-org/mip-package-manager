@@ -104,8 +104,15 @@ function install(varargin)
                   '"%s" is not a directory.', localPath);
         end
         if ~isfile(fullfile(localPath, 'mip.yaml'))
-            error('mip:install:noMipYaml', ...
-                  'Directory "%s" does not contain a mip.yaml file.', localPath);
+            if confirmAutoInit(localPath)
+                mip.init(localPath);
+                fprintf('\n');
+            else
+                error('mip:install:abortedNoMipYaml', ...
+                      ['Directory "%s" does not contain a mip.yaml file ' ...
+                       'and the user declined to auto-generate one. ' ...
+                       'Install aborted.'], localPath);
+            end
         end
         mip.build.install_local(localPath, editable, noCompile);
     end
@@ -500,6 +507,19 @@ function rmTempDir(d)
     if exist(d, 'dir')
         rmdir(d, 's');
     end
+end
+
+function tf = confirmAutoInit(localPath)
+% Ask the user whether to auto-generate a mip.yaml in localPath.
+% Honors MIP_CONFIRM as a non-interactive override (matching uninstall.m).
+% Returns true on "y"/"yes", false otherwise.
+    fprintf('\nDirectory "%s" does not contain a mip.yaml file.\n', localPath);
+    fprintf('mip can auto-generate one for you (equivalent to running `mip init`).\n');
+    confirm = getenv('MIP_CONFIRM');
+    if isempty(confirm)
+        confirm = input('Auto-generate mip.yaml? (y/n): ', 's');
+    end
+    tf = strcmpi(confirm, 'y') || strcmpi(confirm, 'yes');
 end
 
 function tf = isLocalPathArg(pkg)
