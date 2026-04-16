@@ -373,7 +373,25 @@ A loading stack tracks the current dependency chain. If a package appears in its
 
 `mip load pkg1 pkg2 --sticky` loads all listed packages. Each is marked as directly loaded. The `--sticky` flag applies to all of them. Packages are loaded in argument order; if any package errors, loading stops and remaining packages on the command line are not attempted.
 
-### 4.7 `load_package.m` Execution
+### 4.7 The `--addpath` and `--rmpath` Flags
+
+`mip load <pkg> --addpath <relpath>` adds `fullfile(srcDir, relpath)` to the MATLAB path **after** `load_package.m` has run. `--rmpath <relpath>` removes the same. **Both flags may be repeated** to specify multiple paths in one call (e.g. `mip load foo --addpath src/a --addpath src/b --rmpath src/legacy`); each occurrence is accumulated and applied in argument order.
+
+The `srcDir` resolution is the same one used elsewhere ([`mip.paths.get_source_dir`](../+mip/+paths/get_source_dir.m)):
+- **Editable installs**: `srcDir = source_path` (the user's original source directory).
+- **Non-editable installs**: `srcDir = pkgDir/<name>/` (the copied source subdir, *not* the load-script wrapper dir above it).
+
+Constraints:
+- Only valid with a single positional package argument. With multiple packages, raises `mip:load:addpathSinglePackage`.
+- Applied **only** to the directly-named package, not to transitively-loaded dependencies.
+- Applied even when the package is already loaded (lets the user adjust path entries on an existing load without unload+reload).
+- `--addpath` warns (`mip:load:addpathMissing`) if the target directory does not exist, but still calls `addpath`.
+- `--rmpath` does not error if the target is not currently on the path (matches MATLAB's `rmpath` behavior).
+- `--addpath` / `--rmpath` are **transient**: they are applied at this load and not persisted. A subsequent `mip load` (or reload after `mip update`) without the flags will not re-apply them.
+
+These adjustments are not separately tracked because the unload sweep (§5.8) removes everything under `srcDir` regardless.
+
+### 4.8 `load_package.m` Execution
 
 The load script is executed by `cd`-ing to the package directory and calling `run(loadFile)`. For:
 - **Non-editable installs**: paths are relative, computed from the package directory.
@@ -443,6 +461,14 @@ If two directly-loaded packages share a dependency:
 ### 5.8 `unload_package.m` Execution
 
 Executed by `cd`-ing to the package directory and calling `run(unloadFile)`. If the file doesn't exist, a warning is issued (`mip:unloadNotFound`) but the package is still removed from tracking.
+
+**Defensive path sweep**: after `unload_package.m` returns (and regardless of whether it existed), mip walks the current MATLAB path and `rmpath`s every entry that equals `srcDir` or starts with `srcDir<filesep>`. The `srcDir` is resolved via [`mip.paths.get_source_dir`](../+mip/+paths/get_source_dir.m) — the same base used for `mip load --addpath`/`--rmpath`. The sweep handles three cases:
+
+- Paths added via `mip load --addpath` (which `unload_package.m` doesn't know about).
+- Paths added by `load_package.m` that the matching `unload_package.m` failed to remove (e.g. user-edited scripts that drift out of sync).
+- Packages with no `unload_package.m` at all — the `mip:unloadNotFound` warning still fires, but the path is at least swept clean.
+
+Each swept entry is reported (`swept residual path entry for "<fqn>": <path>`). Because the sweep matches only entries beginning with `srcDir<filesep>` (or exactly equal to `srcDir`), a sibling directory whose name happens to share a prefix is never touched.
 
 ### 5.9 Broken Dependency Warning
 
@@ -840,6 +866,11 @@ The `numbl_wasm` tag serves as a fallback architecture for all `numbl_*` platfor
 | `mip:cannotUnloadMip` | Attempt to unload `mip-org/core/mip` |
 | `mip:loadNotFound` | `load_package.m` missing |
 | `mip:loadError` | `load_package.m` threw an error during execution |
+| `mip:load:missingChannel` | `--channel` flag without a value in `mip load` |
+| `mip:load:missingAddpathValue` | `--addpath` flag without a value |
+| `mip:load:missingRmpathValue` | `--rmpath` flag without a value |
+| `mip:load:addpathSinglePackage` | `--addpath` / `--rmpath` used with multiple positional packages |
+| `mip:load:addpathMissing` | `--addpath` target directory does not exist (warning, not error) |
 | `mip:mipYamlNotFound` | `mip.yaml` missing in source directory |
 | `mip:invalidMipYaml` | `mip.yaml` missing required `name` field |
 | `mip:mipJsonNotFound` | `mip.json` missing in package directory |

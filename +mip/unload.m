@@ -115,23 +115,72 @@ end
 function executeUnload(packageDir, fqn)
     unloadFile = fullfile(packageDir, 'unload_package.m');
 
-    if ~exist(unloadFile, 'file')
+    if exist(unloadFile, 'file')
+        originalDir = pwd;
+        cd(packageDir);
+        try
+            run(unloadFile);
+        catch ME
+            warning('mip:unloadError', ...
+                    'Error executing unload_package.m for package "%s": %s', ...
+                    fqn, ME.message);
+        end
+        cd(originalDir);
+    else
         warning('mip:unloadNotFound', ...
                 'Package "%s" does not have a unload_package.m file. Path changes may persist.', ...
                 fqn);
+    end
+
+    % Defensive sweep: remove any remaining MATLAB path entries that fall
+    % under this package's source directory. This catches paths added via
+    % `mip load --addpath`, plus anything load_package.m put on the path
+    % that unload_package.m did not remove (or both files are missing).
+    sweepPathEntries(packageDir, fqn);
+end
+
+function sweepPathEntries(packageDir, fqn)
+% Remove any MATLAB path entries that lie under the package source dir.
+% Silent if the package was already cleanly unloaded by unload_package.m.
+
+    if ~isfolder(packageDir)
+        return
+    end
+    try
+        pkgInfo = mip.config.read_package_json(packageDir);
+    catch
+        return
+    end
+    srcDir = mip.paths.get_source_dir(packageDir, pkgInfo);
+    if ~isfolder(srcDir)
         return
     end
 
-    originalDir = pwd;
-    cd(packageDir);
-    try
-        run(unloadFile);
-    catch ME
-        warning('mip:unloadError', ...
-                'Error executing unload_package.m for package "%s": %s', ...
-                fqn, ME.message);
+    % Normalize the prefix so startsWith comparisons are accurate. We
+    % match `srcDir` exactly OR `srcDir<filesep>...`, never a sibling
+    % directory whose name happens to share a prefix.
+    prefixWithSep = [srcDir, filesep];
+    entries = strsplit(path, pathsep);
+    toRemove = {};
+    for k = 1:numel(entries)
+        e = entries{k};
+        if isempty(e)
+            continue
+        end
+        if strcmp(e, srcDir) || startsWith(e, prefixWithSep)
+            toRemove{end+1} = e; %#ok<AGROW>
+        end
     end
-    cd(originalDir);
+
+    if isempty(toRemove)
+        return
+    end
+    for k = 1:numel(toRemove)
+        warning('off', 'MATLAB:rmpath:DirNotFound');
+        rmpath(toRemove{k});
+        warning('on', 'MATLAB:rmpath:DirNotFound');
+        fprintf('  swept residual path entry for "%s": %s\n', fqn, toRemove{k});
+    end
 end
 
 function pruneUnusedPackages()
