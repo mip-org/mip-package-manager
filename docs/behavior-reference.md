@@ -314,7 +314,26 @@ If the package is already installed at `local/local/<name>`, prints a message an
 6. The org/channel is determined by the `--channel` flag (default `mip-org/core`).
 7. Mark as directly installed.
 
-### 3.4 Load Hint After Install
+### 3.4 Installation from a Remote `.zip` URL
+
+`mip install <name> --url <zip-url>` installs a package from a remote `.zip` archive, using the positional `<name>` as the package name:
+
+1. Download the archive to a temporary directory.
+2. Extract it. If the archive expands to a single top-level subdirectory (as GitHub-produced source archives do, e.g. `repo-main/`), descend into that subdirectory and treat its contents as the source tree. Otherwise use the extraction root.
+3. If the extracted source has no `mip.yaml`, run `mip init` on it with `--name <name>` and `--repository <zip-url>`. The URL is recorded in the generated mip.yaml's `repository` field. No prompt is issued -- the user opted in by specifying `--url`.
+4. Run a non-editable local install (`mip.build.install_local`) on the extracted source.
+5. Clean up the temp directory regardless of success or failure.
+
+Constraints:
+
+- The URL must point to a `.zip` archive: the URL's path component (before `?` or `#`) ends in `.zip`, case-insensitive. Otherwise raises `mip:install:urlMustBeZip`.
+- Exactly one positional argument is required when `--url` is given, and it must be a bare name (not an FQN, URL, or path). Otherwise raises `mip:install:urlRequiresName` / `mip:install:urlTakesSingleName`.
+- `--url` may appear at most once per call (raises `mip:install:multipleUrls`).
+- `--editable` / `-e` is rejected (the source dir is temporary; raises `mip:install:editableRequiresLocal`).
+
+Limitation: because the source directory is deleted after install, `mip update` cannot reinstall from the original URL. To pull in an updated archive, re-run `mip install <name> --url <zip-url>` (uninstall first if needed).
+
+### 3.5 Load Hint After Install
 
 After installation, a hint is printed showing how to load the package:
 - If the package name is unique across all installed packages, the bare name is shown.
@@ -847,6 +866,13 @@ The `numbl_wasm` tag serves as a fallback architecture for all `numbl_*` platfor
 | `mip:install:noPackage` | No package specified for install |
 | `mip:install:noMipYaml` | Directory doesn't contain `mip.yaml` |
 | `mip:install:abortedNoMipYaml` | Local install aborted because user declined to auto-generate `mip.yaml` |
+| `mip:install:urlRequiresName` | `--url` given without a positional package name |
+| `mip:install:urlTakesSingleName` | `--url` given with 0 or 2+ positional args, or a non-bare-name positional |
+| `mip:install:urlMustBeZip` | `--url` value does not point to a `.zip` archive |
+| `mip:install:multipleUrls` | `--url` passed more than once |
+| `mip:install:missingUrlValue` | `--url` flag provided without a value |
+| `mip:install:zipDownloadFailed` | Download of a `.zip` URL failed |
+| `mip:install:zipExtractFailed` | Extraction of a downloaded `.zip` failed |
 | `mip:install:editableRequiresLocal` | `--editable` used without a local directory |
 | `mip:install:noCompileRequiresEditable` | `--no-compile` used without `--editable` |
 | `mip:update:notInstalled` | Package not installed |

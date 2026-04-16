@@ -116,6 +116,26 @@ classdef TestInit < matlab.unittest.TestCase
             testCase.verifyEqual(cfg.dependencies, {});
         end
 
+        function testInit_RepositoryOverride(testCase)
+            pkgDir = fullfile(testCase.TestDir, 'mypkg');
+            mkdir(pkgDir);
+            url = 'https://example.com/mypkg.zip';
+
+            mip.init(pkgDir, '--repository', url);
+
+            cfg = mip.config.read_mip_yaml(pkgDir);
+            testCase.verifyEqual(cfg.repository, url);
+        end
+
+        function testInit_RepositoryMissingValue_Errors(testCase)
+            pkgDir = fullfile(testCase.TestDir, 'mypkg');
+            mkdir(pkgDir);
+
+            testCase.verifyError( ...
+                @() mip.init(pkgDir, '--repository'), ...
+                'mip:init:missingRepositoryValue');
+        end
+
         function testInit_BuildIsAny(testCase)
             pkgDir = fullfile(testCase.TestDir, 'mypkg');
             mkdir(pkgDir);
