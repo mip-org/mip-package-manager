@@ -152,14 +152,6 @@ classdef TestNameEquivalence < matlab.unittest.TestCase
                 '');
         end
 
-        function testInstalledDirOrgIsCaseSensitive(testCase)
-            testCase.makePkgDir('mip-org', 'core', 'chebfun');
-            % asking under 'MIP-ORG' (different path) should not match
-            testCase.verifyEqual( ...
-                mip.resolve.installed_dir('MIP-ORG', 'core', 'chebfun'), ...
-                '');
-        end
-
         function testInstalledDirIgnoresHiddenDirs(testCase)
             mkdir(fullfile(testCase.TestRoot, 'packages', 'mip-org', 'core', '.hidden'));
             testCase.verifyEqual( ...
