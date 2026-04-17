@@ -244,10 +244,10 @@ If a package is already installed, `mip install` prints a message and skips it. 
 
 ### 3.2 Local Installation
 
-An argument is treated as a local install only when it begins with `~`, `.`, `/`, or a Windows drive letter followed by `:\` or `:/` (see [§3.0](#30-argument-categorization)). Examples: `./mypkg`, `../mypkg`, `.`, `~/proj/mypkg`, `/abs/path/mypkg`, `C:\path\mypkg`, `D:/path/mypkg`. The path must point to an existing directory containing a `mip.yaml` file:
+An argument is treated as a local install only when it begins with `~`, `.`, `/`, or a Windows drive letter followed by `:\` or `:/` (see [§3.0](#30-argument-categorization)). Examples: `./mypkg`, `../mypkg`, `.`, `~/proj/mypkg`, `/abs/path/mypkg`, `C:\path\mypkg`, `D:/path/mypkg`. The path must point to an existing directory:
 
 - If the path is not a directory, raises `mip:install:notADirectory`.
-- If the directory does not contain `mip.yaml`, raises `mip:install:noMipYaml`.
+- If the directory does not contain `mip.yaml`, mip prompts the user (`Auto-generate mip.yaml? (y/n):`) to auto-generate one via `mip init`. On `y`/`yes`, init runs and the install continues. Otherwise, raises `mip:install:abortedNoMipYaml` and no install work is done. The `MIP_CONFIRM` environment variable overrides the prompt (`y` to auto-confirm, anything else to decline) for non-interactive use. This applies to both editable and non-editable local installs.
 
 Bare names without a path prefix are **never** dispatched to local install, even if a directory of the same name exists in the current folder ([§3.0](#30-argument-categorization), [#107](https://github.com/mip-org/mip/issues/107)).
 
@@ -845,7 +845,7 @@ The `numbl_wasm` tag serves as a fallback architecture for all `numbl_*` platfor
 | `mip:mipJsonNotFound` | `mip.json` missing in package directory |
 | `mip:unknownPackage` | Package not installed and not found in any channel |
 | `mip:install:noPackage` | No package specified for install |
-| `mip:install:noMipYaml` | Directory doesn't contain `mip.yaml` |
+| `mip:install:abortedNoMipYaml` | Local install aborted because user declined to auto-generate `mip.yaml` |
 | `mip:install:editableRequiresLocal` | `--editable` used without a local directory |
 | `mip:install:noCompileRequiresEditable` | `--no-compile` used without `--editable` |
 | `mip:update:notInstalled` | Package not installed |
