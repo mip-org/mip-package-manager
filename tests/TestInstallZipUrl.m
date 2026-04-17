@@ -164,26 +164,29 @@ classdef TestInstallZipUrl < matlab.unittest.TestCase
 
         %% --- File Exchange URL handling ---
 
-        function testFxUrl_NotRejectedAsNonZip(testCase)
+        function testFexUrl_NotRejectedAsNonZip(testCase)
             % File Exchange landing URLs do not end in .zip but are NOT
-            % rejected by urlMustBeZip; they go through the FX resolver.
+            % rejected by urlMustBeZip; they go through the FEX resolver.
             % Skip the e2e network call by checking that the error is
             % anything OTHER than urlMustBeZip when DNS fails on a fake
-            % FX-shaped URL.
+            % FEX-shaped URL.
+            if ~isempty(getenv('MIP_SKIP_REMOTE'))
+                return;
+            end
             try
                 mip.install('mypkg', '--url', ...
                     'https://www.mathworks.com/matlabcentral/fileexchange/0-nonexistent');
                 testCase.verifyFail('expected an error');
             catch ME
                 testCase.verifyNotEqual(ME.identifier, 'mip:install:urlMustBeZip', ...
-                    'FX URL should not be rejected as non-zip');
+                    'FEX URL should not be rejected as non-zip');
                 % Either resolution failed or the resolved URL is bad.
                 % Both are acceptable; the test passes as long as it's
                 % not urlMustBeZip.
             end
         end
 
-        function testFxUrl_E2EInstall(testCase)
+        function testFexUrl_E2EInstall(testCase)
             % End-to-end install from a real File Exchange URL. Uses
             % shadedErrorBar (a small, widely-used plotting utility) as
             % a benign test target. Silently returns under MIP_SKIP_REMOTE
@@ -192,18 +195,18 @@ classdef TestInstallZipUrl < matlab.unittest.TestCase
             if ~isempty(getenv('MIP_SKIP_REMOTE'))
                 return;
             end
-            fxUrl = ['https://www.mathworks.com/matlabcentral/fileexchange/' ...
+            fexUrl = ['https://www.mathworks.com/matlabcentral/fileexchange/' ...
                      '26311-shadederrorbar'];
-            mip.install('fx_seb_test', '--url', fxUrl);
+            mip.install('fex_seb_test', '--url', fexUrl);
 
             installedDir = fullfile(testCase.TestRoot, 'packages', ...
-                                    'local', 'local', 'fx_seb_test');
+                                    'local', 'local', 'fex_seb_test');
             testCase.verifyTrue(exist(installedDir, 'dir') > 0, ...
-                'FX package should install under local/local/');
+                'FEX package should install under local/local/');
 
             % The auto-generated mip.yaml's repository field should be
-            % the resolved zip URL (UUID path), not the original FX URL.
-            innerYaml = fullfile(installedDir, 'fx_seb_test', 'mip.yaml');
+            % the resolved zip URL (UUID path), not the original FEX URL.
+            innerYaml = fullfile(installedDir, 'fex_seb_test', 'mip.yaml');
             cfg = mip.config.read_mip_yaml(fileparts(innerYaml));
             testCase.verifyTrue(endsWith(lower(cfg.repository), '.zip'), ...
                 'repository should be the resolved .zip URL');

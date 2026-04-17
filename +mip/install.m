@@ -678,7 +678,7 @@ function tf = isFileExchangeUrl(url)
          startsWith(url, 'http://www.mathworks.com/matlabcentral/fileexchange/');
 end
 
-function zipUrl = resolveFileExchangeUrl(fxUrl)
+function zipUrl = resolveFileExchangeUrl(fexUrl)
 % Resolve a File Exchange landing URL to the underlying .zip download URL.
 % Appends ?download=true (or &download=true if a query string is already
 % present), issues a HEAD request, follows the 302 redirect to the UUID-
@@ -687,10 +687,10 @@ function zipUrl = resolveFileExchangeUrl(fxUrl)
 % A non-default User-Agent is required: the MathWorks Akamai layer
 % returns 403 to MATLAB's default UA, but accepts curl-style UAs.
 
-    if contains(fxUrl, '?')
-        landingUrl = [fxUrl '&download=true'];
+    if contains(fexUrl, '?')
+        landingUrl = [fexUrl '&download=true'];
     else
-        landingUrl = [fxUrl '?download=true'];
+        landingUrl = [fexUrl '?download=true'];
     end
 
     try
@@ -700,19 +700,19 @@ function zipUrl = resolveFileExchangeUrl(fxUrl)
         opt = matlab.net.http.HTTPOptions('ConnectTimeout', 30);
         [~, ~, history] = send(req, uri, opt);
     catch ME
-        error('mip:install:fxResolveFailed', ...
-              'Failed to resolve File Exchange URL %s: %s', fxUrl, ME.message);
+        error('mip:install:fexResolveFailed', ...
+              'Failed to resolve File Exchange URL %s: %s', fexUrl, ME.message);
     end
 
     if isempty(history)
-        error('mip:install:fxResolveFailed', ...
-              'Empty redirect history for File Exchange URL %s.', fxUrl);
+        error('mip:install:fexResolveFailed', ...
+              'Empty redirect history for File Exchange URL %s.', fexUrl);
     end
 
     finalStatus = double(history(end).Response.StatusCode);
     if finalStatus < 200 || finalStatus >= 300
-        error('mip:install:fxResolveFailed', ...
-              'File Exchange URL %s returned HTTP %d.', fxUrl, finalStatus);
+        error('mip:install:fexResolveFailed', ...
+              'File Exchange URL %s returned HTTP %d.', fexUrl, finalStatus);
     end
 
     finalUrl = char(history(end).URI);
@@ -728,9 +728,9 @@ function zipUrl = resolveFileExchangeUrl(fxUrl)
     end
 
     if ~endsWith(lower(finalUrl), '.zip')
-        error('mip:install:fxResolveFailed', ...
+        error('mip:install:fexResolveFailed', ...
               ['File Exchange URL %s did not resolve to a .zip URL ' ...
-               '(got: %s).'], fxUrl, finalUrl);
+               '(got: %s).'], fexUrl, finalUrl);
     end
 
     zipUrl = finalUrl;
