@@ -3,15 +3,16 @@ function init(varargin)
 %
 % Usage:
 %   mip init [<path>]
-%   mip init [<path>] [--name <packagename>]
+%   mip init [<path>] [--name <packagename>] [--repository <url>]
 %
 % Generates a mip.yaml in the given directory (defaults to the current
 % directory if no path is provided). The package name defaults to the
 % directory's basename and can be overridden with --name. Optional
 % string fields (description, version, license, homepage, repository)
-% are emitted blank for the user to fill in. The list of addpaths is
-% determined automatically by walking the directory and identifying
-% folders that contain runtime MATLAB code.
+% are emitted blank for the user to fill in (--repository fills in that
+% field instead of leaving it blank). The list of addpaths is determined
+% automatically by walking the directory and identifying folders that
+% contain runtime MATLAB code.
 %
 % A blank `test_<name>.m` script is created (if not already present) and
 % referenced from the generated mip.yaml's `test_script` field.
@@ -21,6 +22,7 @@ function init(varargin)
 
     targetPath = '';
     overrideName = '';
+    repository = '';
 
     i = 1;
     while i <= numel(varargin)
@@ -30,6 +32,13 @@ function init(varargin)
                 error('mip:init:missingNameValue', '--name requires a value.');
             end
             overrideName = varargin{i + 1};
+            i = i + 2;
+        elseif ischar(arg) && strcmp(arg, '--repository')
+            if i + 1 > numel(varargin)
+                error('mip:init:missingRepositoryValue', ...
+                      '--repository requires a value.');
+            end
+            repository = varargin{i + 1};
             i = i + 2;
         elseif isempty(targetPath)
             targetPath = arg;
@@ -85,7 +94,7 @@ function init(varargin)
         fclose(fid);
     end
 
-    write_mip_yaml(mipYamlPath, pkgName, addpaths, testScript);
+    write_mip_yaml(mipYamlPath, pkgName, addpaths, testScript, repository);
 
     fprintf('Created %s\n', mipYamlPath);
     fprintf('Created %s\n', testScriptPath);
@@ -100,7 +109,7 @@ function tf = is_valid_package_name(name)
 end
 
 
-function write_mip_yaml(yamlPath, pkgName, addpaths, testScript)
+function write_mip_yaml(yamlPath, pkgName, addpaths, testScript, repository)
     fid = fopen(yamlPath, 'w');
     if fid == -1
         error('mip:init:writeFailed', ...
@@ -113,7 +122,7 @@ function write_mip_yaml(yamlPath, pkgName, addpaths, testScript)
     fprintf(fid, 'version: "unknown"\n');
     fprintf(fid, 'license: ""\n');
     fprintf(fid, 'homepage: ""\n');
-    fprintf(fid, 'repository: ""\n');
+    fprintf(fid, 'repository: "%s"\n', repository);
     fprintf(fid, 'dependencies: []\n');
     fprintf(fid, '\n');
 
