@@ -452,7 +452,11 @@ function downloadAndInstall(fqn, packageInfo, pkgDir)
     cleanupTemp = onCleanup(@() rmTempDir(tempDir));
 
     try
-        mhlPath = mip.channel.download_mhl(packageInfo.mhl_url, tempDir);
+        expectedSha = '';
+        if isfield(packageInfo, 'mhl_sha256')
+            expectedSha = packageInfo.mhl_sha256;
+        end
+        mhlPath = mip.channel.download_mhl(packageInfo.mhl_url, tempDir, expectedSha);
         parentDir = fileparts(pkgDir);
         if ~exist(parentDir, 'dir')
             mkdir(parentDir);

@@ -341,7 +341,11 @@ function downloadAndReplace(p)
     tempDir = tempname;
     mkdir(tempDir);
     try
-        mhlPath = mip.channel.download_mhl(p.latestInfo.mhl_url, tempDir);
+        expectedSha = '';
+        if isfield(p.latestInfo, 'mhl_sha256')
+            expectedSha = p.latestInfo.mhl_sha256;
+        end
+        mhlPath = mip.channel.download_mhl(p.latestInfo.mhl_url, tempDir, expectedSha);
         stagingDir = fullfile(tempDir, 'staging');
         mip.channel.extract_mhl(mhlPath, stagingDir);
 
@@ -484,7 +488,11 @@ function updateSelf(p, force)
     mkdir(tempDir);
 
     try
-        mhlPath = mip.channel.download_mhl(latestInfo.mhl_url, tempDir);
+        expectedSha = '';
+        if isfield(latestInfo, 'mhl_sha256')
+            expectedSha = latestInfo.mhl_sha256;
+        end
+        mhlPath = mip.channel.download_mhl(latestInfo.mhl_url, tempDir, expectedSha);
         stagingDir = fullfile(tempDir, 'staging');
         mip.channel.extract_mhl(mhlPath, stagingDir);
         unloadScript = fullfile(pkgDir, 'unload_package.m');
