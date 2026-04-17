@@ -256,10 +256,7 @@ function applyPathAdjustments(packageDir, fqn, addPathRels, rmPathRels)
     for i = 1:length(addPathRels)
         rel = addPathRels{i};
         target = fullfile(srcDir, rel);
-        if ~isfolder(target)
-            warning('mip:load:addpathMissing', ...
-                    '--addpath target does not exist for "%s": %s', fqn, target);
-        end
+        % addpath emits MATLAB:addpath:DirNotFound if the target is missing.
         addpath(target);
         fprintf('  +addpath %s\n', target);
     end

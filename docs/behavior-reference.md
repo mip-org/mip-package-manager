@@ -385,9 +385,10 @@ Constraints:
 - Only valid with a single positional package argument. With multiple packages, raises `mip:load:addpathSinglePackage`.
 - Applied **only** to the directly-named package, not to transitively-loaded dependencies.
 - Applied even when the package is already loaded (lets the user adjust path entries on an existing load without unload+reload).
-- `--addpath` warns (`mip:load:addpathMissing`) if the target directory does not exist, but still calls `addpath`.
-- `--rmpath` does not error if the target is not currently on the path (matches MATLAB's `rmpath` behavior).
+- `--addpath` still calls `addpath` if the target directory does not exist; MATLAB emits its native `MATLAB:mpath:nameNonexistentOrNotADirectory` warning.
+- `--rmpath` does not error if the target is not currently on the path (matches MATLAB's `rmpath` behavior, which emits `MATLAB:rmpath:DirNotFound`).
 - `--addpath` / `--rmpath` are **transient**: they are applied at this load and not persisted. A subsequent `mip load` (or reload after `mip update`) without the flags will not re-apply them.
+- The relative path is **not sandboxed**: `fullfile(srcDir, relpath)` is passed to `addpath` / `rmpath` as-is, so `..` segments escape `srcDir`. Entries outside `srcDir` will also not be caught by the unload sweep (§5.8), so the user is responsible for cleaning them up.
 
 These adjustments are not separately tracked because the unload sweep (§5.8) removes everything under `srcDir` regardless.
 
@@ -870,7 +871,6 @@ The `numbl_wasm` tag serves as a fallback architecture for all `numbl_*` platfor
 | `mip:load:missingAddpathValue` | `--addpath` flag without a value |
 | `mip:load:missingRmpathValue` | `--rmpath` flag without a value |
 | `mip:load:addpathSinglePackage` | `--addpath` / `--rmpath` used with multiple positional packages |
-| `mip:load:addpathMissing` | `--addpath` target directory does not exist (warning, not error) |
 | `mip:mipYamlNotFound` | `mip.yaml` missing in source directory |
 | `mip:invalidMipYaml` | `mip.yaml` missing required `name` field |
 | `mip:mipJsonNotFound` | `mip.json` missing in package directory |

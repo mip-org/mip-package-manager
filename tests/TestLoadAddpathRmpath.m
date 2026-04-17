@@ -39,28 +39,34 @@ classdef TestLoadAddpathRmpath < matlab.unittest.TestCase
         %% --- Flag parsing / validation ---
 
         function testAddpath_MissingValue_Errors(testCase)
-            createSourcePackage(testCase, 'foo');
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true);
             testCase.verifyError(@() mip.load('foo', '--addpath'), ...
                 'mip:load:missingAddpathValue');
         end
 
         function testRmpath_MissingValue_Errors(testCase)
-            createSourcePackage(testCase, 'foo');
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true);
             testCase.verifyError(@() mip.load('foo', '--rmpath'), ...
                 'mip:load:missingRmpathValue');
         end
 
         function testAddpath_MultiplePackages_Errors(testCase)
-            createSourcePackage(testCase, 'foo');
-            createSourcePackage(testCase, 'bar');
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true);
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'bar', ...
+                'sourceSubdir', true);
             testCase.verifyError( ...
                 @() mip.load('foo', 'bar', '--addpath', 'src'), ...
                 'mip:load:addpathSinglePackage');
         end
 
         function testRmpath_MultiplePackages_Errors(testCase)
-            createSourcePackage(testCase, 'foo');
-            createSourcePackage(testCase, 'bar');
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true);
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'bar', ...
+                'sourceSubdir', true);
             testCase.verifyError( ...
                 @() mip.load('foo', 'bar', '--rmpath', 'src'), ...
                 'mip:load:addpathSinglePackage');
@@ -69,7 +75,8 @@ classdef TestLoadAddpathRmpath < matlab.unittest.TestCase
         %% --- Apply --addpath ---
 
         function testAddpath_AddsSourceRelativePath(testCase)
-            pkgDir = createSourcePackage(testCase, 'foo', {'src/extra'});
+            pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true, 'subdirs', {'src/extra'});
             mip.load('foo', '--addpath', 'src/extra');
             expected = fullfile(pkgDir, 'foo', 'src', 'extra');
             testCase.verifyTrue(onPath(expected), ...
@@ -77,21 +84,25 @@ classdef TestLoadAddpathRmpath < matlab.unittest.TestCase
         end
 
         function testAddpath_MultipleFlagsAccumulate(testCase)
-            pkgDir = createSourcePackage(testCase, 'foo', {'src/a', 'src/b'});
+            pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true, 'subdirs', {'src/a', 'src/b'});
             mip.load('foo', '--addpath', 'src/a', '--addpath', 'src/b');
             testCase.verifyTrue(onPath(fullfile(pkgDir, 'foo', 'src', 'a')));
             testCase.verifyTrue(onPath(fullfile(pkgDir, 'foo', 'src', 'b')));
         end
 
         function testAddpath_MissingDirWarns(testCase)
-            createSourcePackage(testCase, 'foo');
+            % Rely on MATLAB's native addpath warning rather than a custom one.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true);
             testCase.verifyWarning( ...
                 @() mip.load('foo', '--addpath', 'does/not/exist'), ...
-                'mip:load:addpathMissing');
+                'MATLAB:mpath:nameNonexistentOrNotADirectory');
         end
 
         function testAddpath_AppliesToAlreadyLoaded(testCase)
-            pkgDir = createSourcePackage(testCase, 'foo', {'src/extra'});
+            pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true, 'subdirs', {'src/extra'});
             mip.load('foo');
             % Now adjust the path on the already-loaded package
             mip.load('foo', '--addpath', 'src/extra');
@@ -101,9 +112,10 @@ classdef TestLoadAddpathRmpath < matlab.unittest.TestCase
         %% --- Apply --rmpath ---
 
         function testRmpath_RemovesPreLoadedPath(testCase)
-            % load_package.m adds pkg_dir; --rmpath foo (the source subdir)
-            % removes the source subdir if it was on the path.
-            pkgDir = createSourcePackage(testCase, 'foo');
+            % load_package.m adds pkg_dir/foo; --rmpath . removes the
+            % source subdir if it was on the path.
+            pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true);
             sourceSubdir = fullfile(pkgDir, 'foo');
             addpath(sourceSubdir);
             testCase.verifyTrue(onPath(sourceSubdir));
@@ -112,10 +124,22 @@ classdef TestLoadAddpathRmpath < matlab.unittest.TestCase
                 '--rmpath should remove the source-relative target');
         end
 
+        function testRmpath_NotOnPath_WarnsFromMatlab(testCase)
+            % --rmpath of a target that is not currently on the search path
+            % surfaces MATLAB's native rmpath warning. This pins the
+            % documented behavior (rmpath warns rather than errors).
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true, 'subdirs', {'src/extra'});
+            testCase.verifyWarning( ...
+                @() mip.load('foo', '--rmpath', 'src/extra'), ...
+                'MATLAB:rmpath:DirNotFound');
+        end
+
         %% --- Unload sweep ---
 
         function testUnload_SweepsAddpathEntries(testCase)
-            pkgDir = createSourcePackage(testCase, 'foo', {'src/extra'});
+            pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true, 'subdirs', {'src/extra'});
             mip.load('foo', '--addpath', 'src/extra');
             target = fullfile(pkgDir, 'foo', 'src', 'extra');
             testCase.verifyTrue(onPath(target));
@@ -125,11 +149,12 @@ classdef TestLoadAddpathRmpath < matlab.unittest.TestCase
                 'unload sweep should remove --addpath entries');
         end
 
-        function testUnload_SweepsLoadPackageEntriesIfMissingUnloadScript(testCase)
+        function testUnload_SweepsResidualEntriesFromNoopUnloadScript(testCase)
             % Build a package where load_package.m adds a path but
             % unload_package.m DOES NOT remove it. The sweep should still
             % clean it up.
-            pkgDir = createSourcePackage(testCase, 'foo');
+            pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true);
             sourceSubdir = fullfile(pkgDir, 'foo');
             % Replace unload_package.m with a no-op
             fid = fopen(fullfile(pkgDir, 'unload_package.m'), 'w');
@@ -148,7 +173,8 @@ classdef TestLoadAddpathRmpath < matlab.unittest.TestCase
         function testUnload_DoesNotTouchUnrelatedSiblingPaths(testCase)
             % Create a sibling directory whose name shares a prefix with
             % the package source dir. The sweep must not touch it.
-            pkgDir = createSourcePackage(testCase, 'foo');
+            pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
+                'sourceSubdir', true);
             sourceSubdir = fullfile(pkgDir, 'foo');
             siblingDir = [sourceSubdir '_sibling'];
             mkdir(siblingDir);
@@ -167,9 +193,11 @@ classdef TestLoadAddpathRmpath < matlab.unittest.TestCase
             % Dep `dep1` has a src/extra dir. Main package depends on dep1.
             % Loading the main package with --addpath src/extra should
             % NOT addpath the dep's src/extra.
-            depDir = createSourcePackage(testCase, 'dep1', {'src/extra'});
-            mainDir = createSourcePackage(testCase, 'main', ...
-                {'src/extra'}, {'dep1'});
+            depDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'dep1', ...
+                'sourceSubdir', true, 'subdirs', {'src/extra'});
+            mainDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'main', ...
+                'sourceSubdir', true, 'subdirs', {'src/extra'}, ...
+                'dependencies', {'dep1'});
 
             mip.load('main', '--addpath', 'src/extra');
 
@@ -182,65 +210,6 @@ classdef TestLoadAddpathRmpath < matlab.unittest.TestCase
         end
 
     end
-end
-
-
-function pkgDir = createSourcePackage(testCase, pkgName, subdirs, deps)
-% Create a non-editable installed package shaped like the standard mip
-% layout: pkgDir/load_package.m, unload_package.m, mip.json, and a
-% pkgDir/<pkgName>/ subdir containing the source. load_package.m adds
-% pkgDir/<pkgName>/ to the path; unload_package.m removes it.
-%
-% subdirs (optional): cell array of source-relative subdirs to mkdir
-%                     under pkgDir/<pkgName>/.
-% deps    (optional): cell array of dependency names to record in mip.json.
-
-    if nargin < 3, subdirs = {}; end
-    if nargin < 4, deps = {}; end
-
-    pkgDir = fullfile(testCase.TestRoot, 'packages', 'mip-org', 'core', pkgName);
-    if ~exist(pkgDir, 'dir')
-        mkdir(pkgDir);
-    end
-    sourceDir = fullfile(pkgDir, pkgName);
-    mkdir(sourceDir);
-    for i = 1:numel(subdirs)
-        mkdir(fullfile(sourceDir, subdirs{i}));
-    end
-
-    % mip.json
-    mipData = struct( ...
-        'name', pkgName, ...
-        'version', '1.0.0', ...
-        'description', '', ...
-        'architecture', 'any');
-    if isempty(deps)
-        mipData.dependencies = reshape({}, 0, 1);
-    else
-        mipData.dependencies = deps;
-    end
-    fid = fopen(fullfile(pkgDir, 'mip.json'), 'w');
-    fwrite(fid, jsonencode(mipData));
-    fclose(fid);
-
-    % load_package.m: addpath(pkg_dir/<pkgName>)
-    fid = fopen(fullfile(pkgDir, 'load_package.m'), 'w');
-    fprintf(fid, 'function load_package()\n');
-    fprintf(fid, '    pkg_dir = fileparts(mfilename(''fullpath''));\n');
-    fprintf(fid, '    addpath(fullfile(pkg_dir, ''%s''));\n', pkgName);
-    fprintf(fid, 'end\n');
-    fclose(fid);
-
-    % unload_package.m: rmpath(pkg_dir/<pkgName>)
-    fid = fopen(fullfile(pkgDir, 'unload_package.m'), 'w');
-    fprintf(fid, 'function unload_package()\n');
-    fprintf(fid, '    pkg_dir = fileparts(mfilename(''fullpath''));\n');
-    fprintf(fid, '    target = fullfile(pkg_dir, ''%s'');\n', pkgName);
-    fprintf(fid, '    if ismember(target, strsplit(path, pathsep))\n');
-    fprintf(fid, '        rmpath(target);\n');
-    fprintf(fid, '    end\n');
-    fprintf(fid, 'end\n');
-    fclose(fid);
 end
 
 

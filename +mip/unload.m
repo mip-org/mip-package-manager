@@ -175,10 +175,10 @@ function sweepPathEntries(packageDir, fqn)
     if isempty(toRemove)
         return
     end
+    oldState = warning('off', 'MATLAB:rmpath:DirNotFound');
+    restoreWarn = onCleanup(@() warning(oldState));
     for k = 1:numel(toRemove)
-        warning('off', 'MATLAB:rmpath:DirNotFound');
         rmpath(toRemove{k});
-        warning('on', 'MATLAB:rmpath:DirNotFound');
         fprintf('  swept residual path entry for "%s": %s\n', fqn, toRemove{k});
     end
 end
