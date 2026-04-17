@@ -845,7 +845,6 @@ The `numbl_wasm` tag serves as a fallback architecture for all `numbl_*` platfor
 | `mip:mipJsonNotFound` | `mip.json` missing in package directory |
 | `mip:unknownPackage` | Package not installed and not found in any channel |
 | `mip:install:noPackage` | No package specified for install |
-| `mip:install:noMipYaml` | Directory doesn't contain `mip.yaml` |
 | `mip:install:abortedNoMipYaml` | Local install aborted because user declined to auto-generate `mip.yaml` |
 | `mip:install:editableRequiresLocal` | `--editable` used without a local directory |
 | `mip:install:noCompileRequiresEditable` | `--no-compile` used without `--editable` |
