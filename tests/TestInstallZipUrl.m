@@ -162,5 +162,59 @@ classdef TestInstallZipUrl < matlab.unittest.TestCase
                 'mip:install:zipDownloadFailed');
         end
 
+        %% --- File Exchange URL handling ---
+
+        function testFexUrl_NotRejectedAsNonZip(testCase)
+            % File Exchange landing URLs do not end in .zip but are NOT
+            % rejected by urlMustBeZip; they go through the FEX resolver.
+            % Skip the e2e network call by checking that the error is
+            % anything OTHER than urlMustBeZip when DNS fails on a fake
+            % FEX-shaped URL.
+            if ~isempty(getenv('MIP_SKIP_REMOTE'))
+                return;
+            end
+            try
+                mip.install('mypkg', '--url', ...
+                    'https://www.mathworks.com/matlabcentral/fileexchange/0-nonexistent');
+                testCase.verifyFail('expected an error');
+            catch ME
+                testCase.verifyNotEqual(ME.identifier, 'mip:install:urlMustBeZip', ...
+                    'FEX URL should not be rejected as non-zip');
+                % Either resolution failed or the resolved URL is bad.
+                % Both are acceptable; the test passes as long as it's
+                % not urlMustBeZip.
+            end
+        end
+
+        function testFexUrl_E2EInstall(testCase)
+            % End-to-end install from a real File Exchange URL. Uses
+            % shadedErrorBar (a small, widely-used plotting utility) as
+            % a benign test target. Silently returns under MIP_SKIP_REMOTE
+            % (matches the pattern in run_tests.m of conditionally
+            % including remote suites).
+            if ~isempty(getenv('MIP_SKIP_REMOTE'))
+                return;
+            end
+            fexUrl = ['https://www.mathworks.com/matlabcentral/fileexchange/' ...
+                     '26311-shadederrorbar'];
+            mip.install('fex_seb_test', '--url', fexUrl);
+
+            installedDir = fullfile(testCase.TestRoot, 'packages', ...
+                                    'local', 'local', 'fex_seb_test');
+            testCase.verifyTrue(exist(installedDir, 'dir') > 0, ...
+                'FEX package should install under local/local/');
+
+            % The auto-generated mip.yaml's repository field should be
+            % the resolved zip URL (UUID path), not the original FEX URL.
+            innerYaml = fullfile(installedDir, 'fex_seb_test', 'mip.yaml');
+            cfg = mip.config.read_mip_yaml(fileparts(innerYaml));
+            testCase.verifyTrue(endsWith(lower(cfg.repository), '.zip'), ...
+                'repository should be the resolved .zip URL');
+            testCase.verifyTrue(contains(cfg.repository, 'mlc-downloads'), ...
+                'repository should be the UUID-based mlc-downloads URL');
+            testCase.verifyFalse(contains(cfg.repository, '?'), ...
+                'repository should have query string stripped');
+        end
+
     end
 end
