@@ -65,11 +65,13 @@ function init(varargin)
 
     if ~is_valid_package_name(pkgName)
         error('mip:init:invalidName', ...
-              ['"%s" is not a valid package name. Names must match ' ...
-               '[-a-zA-Z0-9_.]+ and not be "." or "..". ' ...
-               'Use --name to override.'], pkgName);
+              ['"%s" is not a valid package name. Names must contain only ' ...
+               'letters, digits, hyphens, and underscores, and must start ' ...
+               'and end with a letter or digit. Use --name to override.'], pkgName);
     end
 
+    % Discover addpaths before creating the test script so the new file
+    % doesn't cause the root to be auto-included.
     addpaths = mip.init.auto_add_paths(targetDir);
 
     testScript = sprintf('test_%s.m', pkgName);
@@ -94,8 +96,7 @@ end
 
 
 function tf = is_valid_package_name(name)
-    tf = ~isempty(regexp(name, '^[-a-zA-Z0-9_.]+$', 'once')) && ...
-         ~strcmp(name, '.') && ~strcmp(name, '..');
+    tf = ~isempty(regexp(name, '^[a-zA-Z0-9]([-a-zA-Z0-9_]*[a-zA-Z0-9])?$', 'once'));
 end
 
 
@@ -109,7 +110,7 @@ function write_mip_yaml(yamlPath, pkgName, addpaths, testScript)
 
     fprintf(fid, 'name: %s\n', pkgName);
     fprintf(fid, 'description: ""\n');
-    fprintf(fid, 'version: ""\n');
+    fprintf(fid, 'version: "unknown"\n');
     fprintf(fid, 'license: ""\n');
     fprintf(fid, 'homepage: ""\n');
     fprintf(fid, 'repository: ""\n');
