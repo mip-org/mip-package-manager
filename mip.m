@@ -122,9 +122,6 @@ switch command
         mip.bundle(varargin{:});
 
     case 'init'
-        if nargin < 2
-            error('mip:noDirectory', 'A directory path is required for init command.');
-        end
         mip.init(varargin{:});
 
     case 'reset'

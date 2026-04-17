@@ -22,8 +22,18 @@ classdef TestInit < matlab.unittest.TestCase
 
     methods (Test)
 
-        function testInit_NoArgsErrors(testCase)
-            testCase.verifyError(@() mip.init(), 'mip:init:noPath');
+        function testInit_NoArgsUsesCurrentDir(testCase)
+            pkgDir = fullfile(testCase.TestDir, 'mypkg');
+            mkdir(pkgDir);
+            origDir = pwd;
+            cleaner = onCleanup(@() cd(origDir));
+            cd(pkgDir);
+
+            mip.init();
+
+            testCase.verifyTrue(exist(fullfile(pkgDir, 'mip.yaml'), 'file') > 0);
+            cfg = mip.config.read_mip_yaml(pkgDir);
+            testCase.verifyEqual(cfg.name, 'mypkg');
         end
 
         function testInit_NonexistentPathErrors(testCase)

@@ -2,11 +2,12 @@ function init(varargin)
 %INIT   Initialize a new mip package by generating a mip.yaml.
 %
 % Usage:
-%   mip init <path>
-%   mip init . [--name <packagename>]
+%   mip init [<path>]
+%   mip init [<path>] [--name <packagename>]
 %
-% Generates a mip.yaml in the given directory. The package name defaults
-% to the directory's basename and can be overridden with --name. Optional
+% Generates a mip.yaml in the given directory (defaults to the current
+% directory if no path is provided). The package name defaults to the
+% directory's basename and can be overridden with --name. Optional
 % string fields (description, version, license, homepage, repository)
 % are emitted blank for the user to fill in. The list of addpaths is
 % determined automatically by walking the directory and identifying
@@ -17,11 +18,6 @@ function init(varargin)
 %
 % If the target directory already contains a mip.yaml, init prints a
 % message and exits without modifying anything.
-
-    if nargin < 1
-        error('mip:init:noPath', ...
-              'A directory path is required for init command.');
-    end
 
     targetPath = '';
     overrideName = '';
@@ -44,8 +40,7 @@ function init(varargin)
     end
 
     if isempty(targetPath)
-        error('mip:init:noPath', ...
-              'A directory path is required for init command.');
+        targetPath = '.';
     end
 
     targetDir = mip.paths.get_absolute_path(targetPath);
