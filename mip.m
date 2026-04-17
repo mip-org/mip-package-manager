@@ -19,6 +19,8 @@ function varargout = mip(command, varargin)
 %   mip list                                 - List installed packages (reverse load order)
 %   mip list --sort-by-name                  - List installed packages (alphabetical)
 %   mip load <package> [...]  [--sticky]     - Load one or more packages into MATLAB path
+%   mip load <package> --addpath <relpath>   - Add a source-relative path after loading
+%   mip load <package> --rmpath  <relpath>   - Remove a source-relative path after loading
 %   mip unload <package> [...]               - Unload one or more packages from MATLAB path
 %   mip unload --all                         - Unload all non-sticky packages
 %   mip unload --all --force                 - Unload all packages (including sticky)
