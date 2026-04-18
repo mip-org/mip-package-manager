@@ -193,6 +193,27 @@ classdef TestPackageDiscovery < matlab.unittest.TestCase
                 'directly_installed.txt.tmp should not exist after a successful write');
         end
 
+        function testDirectlyInstalled_PreservedOnWriteFailure(testCase)
+            % If writing to the tmp file fails, the original
+            % directly_installed.txt must remain intact — this is the
+            % invariant the atomic write protects.
+            mip.state.set_directly_installed({'mip-org/core/keep1', 'mip-org/core/keep2'});
+
+            % Force fopen(tmpPath, 'w') to fail by pre-creating the tmp
+            % path as a directory.
+            packagesDir = mip.paths.get_packages_dir();
+            tmpPath = fullfile(packagesDir, 'directly_installed.txt.tmp');
+            mkdir(tmpPath);
+
+            testCase.verifyError( ...
+                @() mip.state.set_directly_installed({'mip-org/core/nope'}), ...
+                'mip:fileError');
+
+            pkgs = mip.state.get_directly_installed();
+            testCase.verifyEqual(sort(pkgs), ...
+                sort({'mip-org/core/keep1', 'mip-org/core/keep2'}));
+        end
+
         %% get_package_dir tests
 
         function testGetPackageDir(testCase)
