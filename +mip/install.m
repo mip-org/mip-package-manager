@@ -192,8 +192,18 @@ function install(varargin)
     end
 end
 
-function installedFqns = installFromRepository(repoPackages, channel)
+function installedFqns = installFromRepository(repoPackages, channel, markDirectlyInstalled)
 % Install packages from the mip repository.
+%
+% markDirectlyInstalled (default true) controls whether the packages in
+% repoPackages are added to directly_installed.txt. Callers installing
+% transitive dependencies (e.g. .mhl installs pulling their own deps)
+% should pass false so those deps can be pruned when their parent is
+% uninstalled.
+
+    if nargin < 3
+        markDirectlyInstalled = true;
+    end
 
     installedFqns = {};
 
@@ -377,10 +387,14 @@ function installedFqns = installFromRepository(repoPackages, channel)
             rethrow(ME);
         end
 
-        % Mark requested packages as directly installed and collect their FQNs
+        % Mark requested packages as directly installed and collect their FQNs.
+        % Skip marking when this call is installing transitive dependencies
+        % (e.g. from an .mhl install) so those deps can be pruned later.
         for i = 1:length(resolvedPackages)
             s = resolvedPackages{i};
-            mip.state.add_directly_installed(s.fqn);
+            if markDirectlyInstalled
+                mip.state.add_directly_installed(s.fqn);
+            end
             if ismember(s.fqn, toInstallFqns)
                 installedFqns{end+1} = s.fqn; %#ok<AGROW>
             end
@@ -470,7 +484,7 @@ function installedFqn = installFromMhl(mhlSource, ~, channel)
             fprintf('\nPackage "%s" has dependencies: %s\n', ...
                     fqn, strjoin(pkgInfo.dependencies, ', '));
             fprintf('Installing dependencies from remote repository...\n');
-            installFromRepository(pkgInfo.dependencies, channel);
+            installFromRepository(pkgInfo.dependencies, channel, false);
         end
 
         fprintf('\nInstalling "%s"...\n', fqn);
