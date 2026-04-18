@@ -519,7 +519,11 @@ function downloadAndInstall(fqn, packageInfo, pkgDir)
     cleanupTemp = onCleanup(@() rmTempDir(tempDir));
 
     try
-        mhlPath = mip.channel.download_mhl(packageInfo.mhl_url, tempDir);
+        expectedSha = '';
+        if isfield(packageInfo, 'mhl_sha256')
+            expectedSha = packageInfo.mhl_sha256;
+        end
+        mhlPath = mip.channel.download_mhl(packageInfo.mhl_url, tempDir, expectedSha);
         stagingDir = fullfile(tempDir, 'staging');
         mip.channel.extract_mhl(mhlPath, stagingDir);
         parentDir = fileparts(pkgDir);

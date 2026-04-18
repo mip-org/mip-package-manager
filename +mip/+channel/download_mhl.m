@@ -1,9 +1,14 @@
-function localPath = download_mhl(source, destDir)
+function localPath = download_mhl(source, destDir, expectedSha256)
 %DOWNLOAD_MHL   Download a .mhl package file from URL or copy from local path.
 %
 % Args:
-%   source - URL (http:// or https://) or local file path
-%   destDir - Destination directory for the downloaded file
+%   source          - URL (http:// or https://) or local file path
+%   destDir         - Destination directory for the downloaded file
+%   expectedSha256  - (Optional) Expected hex SHA-256 of the file (case-insensitive).
+%                     If provided and nonempty, the downloaded/copied file is
+%                     verified against this digest. On mismatch the local
+%                     copy is deleted and an error is raised. If the JVM is
+%                     unavailable (e.g. numbl), verification is skipped.
 %
 % Returns:
 %   localPath - Path to the downloaded/copied file
@@ -11,6 +16,11 @@ function localPath = download_mhl(source, destDir)
 % Example:
 %   filepath = mip.channel.download_mhl('https://example.com/pkg.mhl', tempdir);
 %   filepath = mip.channel.download_mhl('/path/to/local/pkg.mhl', tempdir);
+%   filepath = mip.channel.download_mhl(url, tempdir, pkgInfo.mhl_sha256);
+
+if nargin < 3
+    expectedSha256 = '';
+end
 
 % Ensure destination directory exists
 if ~exist(destDir, 'dir')
@@ -58,6 +68,23 @@ else
     catch ME
         error('mip:copyFailed', ...
               'Failed to copy file from %s: %s', source, ME.message);
+    end
+end
+
+if ~isempty(expectedSha256)
+    actual = mip.channel.sha256(localPath);
+    if isempty(actual)
+        % JVM unavailable (e.g. numbl) — skip verification.
+        return
+    end
+    if ~strcmpi(actual, expectedSha256)
+        if exist(localPath, 'file')
+            delete(localPath);
+        end
+        error('mip:digestMismatch', ...
+              ['SHA-256 mismatch for %s\n' ...
+               '  expected: %s\n' ...
+               '  actual:   %s'], source, expectedSha256, actual);
     end
 end
 
