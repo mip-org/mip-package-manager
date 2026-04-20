@@ -2,8 +2,8 @@ name: mip
 description: "MIP package manager for MATLAB"
 version: "main"
 license: Apache-2.0
-homepage: "https://github.com/mip-org/mip-package-manager"
-repository: "https://github.com/mip-org/mip-package-manager"
+homepage: "https://mip.sh"
+repository: "https://github.com/mip-org/mip"
 dependencies: []
 
 addpaths:
