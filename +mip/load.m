@@ -164,7 +164,7 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
         end
         % Apply --addpath/--rmpath even when already loaded so the user
         % can adjust the path of an existing load without re-loading.
-        applyPathAdjustments(packageDir, fqn, addPathRels, rmPathRels);
+        applyPathAdjustments(packageDir, addPathRels, rmPathRels);
         return
     end
 
@@ -241,7 +241,7 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
     fprintf('Loaded package "%s"\n', fqn);
 
     % Apply --addpath / --rmpath after load_package.m has run.
-    applyPathAdjustments(packageDir, fqn, addPathRels, rmPathRels);
+    applyPathAdjustments(packageDir, addPathRels, rmPathRels);
 
     % Mark package as loaded
     mip.state.key_value_append('MIP_LOADED_PACKAGES', fqn);
@@ -277,7 +277,7 @@ function applyMipJsonPaths(packageDir, pkgInfo)
     end
 end
 
-function applyPathAdjustments(packageDir, fqn, addPathRels, rmPathRels) %#ok<INUSD>
+function applyPathAdjustments(packageDir, addPathRels, rmPathRels)
 % Apply --addpath / --rmpath relative to the package's source directory.
 % No-op if both lists are empty.
 
