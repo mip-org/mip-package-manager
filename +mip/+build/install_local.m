@@ -137,18 +137,10 @@ function installEditable(sourceDir, mipConfig, pkgDir, fqn, noCompile)
     [buildEntry, effectiveArch] = mip.build.match_build(mipConfig);
     resolvedConfig = mip.build.resolve_build_config(mipConfig, buildEntry);
 
-    % Compute addpaths relative to the source directory
+    % Compute addpaths relative to the source directory. These are stored
+    % in mip.json verbatim; mip.load resolves them against source_path at
+    % load time (source_path = sourceDir for editable installs).
     addpathsList = mip.build.compute_addpaths(sourceDir, resolvedConfig.addpaths);
-
-    % Convert to absolute paths for editable install
-    absolutePaths = cell(size(addpathsList));
-    for i = 1:length(addpathsList)
-        if strcmp(addpathsList{i}, '.')
-            absolutePaths{i} = sourceDir;
-        else
-            absolutePaths{i} = fullfile(sourceDir, addpathsList{i});
-        end
-    end
 
     % Create package directory
     parentDir = fileparts(pkgDir);
@@ -156,10 +148,6 @@ function installEditable(sourceDir, mipConfig, pkgDir, fqn, noCompile)
         mkdir(parentDir);
     end
     mkdir(pkgDir);
-
-    % Generate load/unload scripts with absolute paths
-    scriptOpts = struct('absolute', true);
-    mip.build.create_path_scripts(pkgDir, absolutePaths, scriptOpts);
 
     % Determine compile_script
     compileScript = '';
@@ -175,6 +163,7 @@ function installEditable(sourceDir, mipConfig, pkgDir, fqn, noCompile)
 
     % Create mip.json (include compile_script and test_script)
     jsonOpts = struct('editable', true, 'source_path', sourceDir);
+    jsonOpts.paths = addpathsList;
     if ~isempty(compileScript)
         jsonOpts.compile_script = compileScript;
     end

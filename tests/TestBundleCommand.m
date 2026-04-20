@@ -122,9 +122,31 @@ classdef TestBundleCommand < matlab.unittest.TestCase
             testCase.addTeardown(@() rmdir(extractDir, 's'));
 
             testCase.verifyTrue(exist(fullfile(extractDir, 'mip.json'), 'file') > 0);
-            testCase.verifyTrue(exist(fullfile(extractDir, 'load_package.m'), 'file') > 0);
-            testCase.verifyTrue(exist(fullfile(extractDir, 'unload_package.m'), 'file') > 0);
             testCase.verifyTrue(exist(fullfile(extractDir, 'mypkg'), 'dir') > 0);
+            % Bundles no longer emit load_package.m / unload_package.m;
+            % the install path list lives in mip.json.
+            testCase.verifyFalse(exist(fullfile(extractDir, 'load_package.m'), 'file') > 0);
+            testCase.verifyFalse(exist(fullfile(extractDir, 'unload_package.m'), 'file') > 0);
+        end
+
+        function testBundle_MipJsonContainsPaths(testCase)
+            % The bundled mip.json must carry a "paths" array so mip.load
+            % can addpath the right source subdirs at load time.
+            srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
+            mip.bundle(srcDir, '--output', testCase.OutputDir, '--arch', 'any');
+
+            jsonFiles = dir(fullfile(testCase.OutputDir, '*.mip.json'));
+            jsonText = fileread(fullfile(testCase.OutputDir, jsonFiles(1).name));
+            jsonData = jsondecode(jsonText);
+            testCase.verifyTrue(isfield(jsonData, 'paths'));
+            % jsondecode may return a scalar string or a cell array for a
+            % single-element JSON array -- normalize before comparing.
+            paths = jsonData.paths;
+            if ~iscell(paths)
+                paths = {paths};
+            end
+            testCase.verifyEqual(paths, {'.'}, ...
+                'createTestSourcePackage declares a single addpath "." so paths should be a one-element list');
         end
 
     end

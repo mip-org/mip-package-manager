@@ -44,6 +44,18 @@ try
         pkgInfo.dependencies = {pkgInfo.dependencies};
     end
 
+    % Normalize paths field IF present. The field is intentionally left
+    % absent when the package has no "paths" entry in mip.json, so callers
+    % can distinguish new-style packages (paths present, even if empty)
+    % from legacy packages (paths absent, use load_package.m instead).
+    if isfield(pkgInfo, 'paths')
+        if isempty(pkgInfo.paths)
+            pkgInfo.paths = {};
+        elseif ~iscell(pkgInfo.paths)
+            pkgInfo.paths = {pkgInfo.paths};
+        end
+    end
+
 catch ME
     if strcmp(ME.identifier, 'mip:invalidMipJson')
         rethrow(ME);

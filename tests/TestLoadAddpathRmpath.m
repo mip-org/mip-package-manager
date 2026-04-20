@@ -171,11 +171,12 @@ classdef TestLoadAddpathRmpath < matlab.unittest.TestCase
         end
 
         function testUnload_SweepsWhenUnloadScriptMissing(testCase)
-            % When unload_package.m does not exist, mip:unloadNotFound
-            % fires AND the sweep still cleans up the path entry that
+            % Legacy-only package (no "paths" in mip.json). When
+            % unload_package.m is also absent, mip:unloadNotFound fires
+            % AND the defensive sweep still cleans up the path entry that
             % load_package.m added.
             pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'foo', ...
-                'sourceSubdir', true);
+                'sourceSubdir', true, 'style', 'legacy');
             sourceSubdir = fullfile(pkgDir, 'foo');
             delete(fullfile(pkgDir, 'unload_package.m'));
 

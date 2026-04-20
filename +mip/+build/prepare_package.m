@@ -14,11 +14,12 @@ function mipConfig = prepare_package(sourceDir, stagingDir, architecture)
 %
 % The resulting stagingDir layout:
 %   stagingDir/
-%     load_package.m
-%     unload_package.m
 %     mip.json
 %     <package_name>/
 %       [all source files]
+%
+% Paths to add to the MATLAB path at load time are stored in mip.json
+% under the "paths" field, relative to the package source directory.
 
 if nargin < 3
     architecture = '';
@@ -63,21 +64,6 @@ end
 % Compute addpaths relative to the source subdir
 addpathsList = mip.build.compute_addpaths(pkgSubdir, resolvedConfig.addpaths);
 
-% Prefix paths with package_name for the load/unload scripts
-% (since scripts live in stagingDir, one level above the source)
-prefixedPaths = cell(size(addpathsList));
-for i = 1:length(addpathsList)
-    if strcmp(addpathsList{i}, '.')
-        prefixedPaths{i} = packageName;
-    else
-        prefixedPaths{i} = fullfile(packageName, addpathsList{i});
-    end
-end
-
-% Generate load/unload scripts in stagingDir
-fprintf('Generating load_package.m and unload_package.m...\n');
-mip.build.create_path_scripts(stagingDir, prefixedPaths);
-
 % Run compilation if specified
 if isfield(resolvedConfig, 'compile_script') && ...
         ~isempty(resolvedConfig.compile_script)
@@ -88,6 +74,7 @@ end
 % Create mip.json
 fprintf('Creating mip.json...\n');
 jsonOpts = struct();
+jsonOpts.paths = addpathsList;
 sourceHashFile = fullfile(pkgSubdir, '.source_hash');
 if exist(sourceHashFile, 'file')
     fid = fopen(sourceHashFile, 'r');

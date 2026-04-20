@@ -124,8 +124,11 @@ end
 
 function executeUnload(packageDir, fqn)
     unloadFile = fullfile(packageDir, 'unload_package.m');
+    hasUnloadScript = exist(unloadFile, 'file') ~= 0;
 
-    if exist(unloadFile, 'file')
+    % Legacy unload_package.m runs first so it sees the paths it expects
+    % to remove before we strip the mip.json "paths" entries.
+    if hasUnloadScript
         originalDir = pwd;
         cd(packageDir);
         try
@@ -136,7 +139,40 @@ function executeUnload(packageDir, fqn)
                     fqn, ME.message);
         end
         cd(originalDir);
-    else
+    end
+
+    % Remove paths declared in mip.json (new-style packages). Missing
+    % packageDir or unreadable mip.json are non-fatal -- the sweep below
+    % is the backstop.
+    pkgInfo = [];
+    if isfolder(packageDir)
+        try
+            pkgInfo = mip.config.read_package_json(packageDir);
+        catch
+            pkgInfo = [];
+        end
+    end
+    hasPathsField = ~isempty(pkgInfo) && isfield(pkgInfo, 'paths');
+    if hasPathsField
+        srcDir = mip.paths.get_source_dir(packageDir, pkgInfo);
+        oldState = warning('off', 'MATLAB:rmpath:DirNotFound');
+        restoreWarn = onCleanup(@() warning(oldState));
+        for i = 1:length(pkgInfo.paths)
+            rel = pkgInfo.paths{i};
+            if strcmp(rel, '.')
+                target = srcDir;
+            else
+                target = fullfile(srcDir, rel);
+            end
+            rmpath(target);
+        end
+        clear restoreWarn;
+    end
+
+    % Warn only when legacy scripts are missing AND the package predates
+    % the mip.json "paths" field -- i.e. we have no authoritative path
+    % list at all and must rely purely on the defensive sweep.
+    if ~hasUnloadScript && ~hasPathsField
         warning('mip:unloadNotFound', ...
                 'Package "%s" does not have a unload_package.m file. Path changes may persist.', ...
                 fqn);
@@ -145,21 +181,23 @@ function executeUnload(packageDir, fqn)
     % Defensive sweep: remove any remaining MATLAB path entries that fall
     % under this package's source directory. This catches paths added via
     % `mip load --addpath`, plus anything load_package.m put on the path
-    % that unload_package.m did not remove (or both files are missing).
-    sweepPathEntries(packageDir, fqn);
+    % that the mip.json "paths" list or unload_package.m did not cover.
+    sweepPathEntries(packageDir, fqn, pkgInfo);
 end
 
-function sweepPathEntries(packageDir, fqn)
+function sweepPathEntries(packageDir, fqn, pkgInfo)
 % Remove any MATLAB path entries that lie under the package source dir.
-% Silent if the package was already cleanly unloaded by unload_package.m.
+% Silent if the package was already cleanly unloaded above.
 
-    if ~isfolder(packageDir)
-        return
-    end
-    try
-        pkgInfo = mip.config.read_package_json(packageDir);
-    catch
-        return
+    if nargin < 3 || isempty(pkgInfo)
+        if ~isfolder(packageDir)
+            return
+        end
+        try
+            pkgInfo = mip.config.read_package_json(packageDir);
+        catch
+            return
+        end
     end
     srcDir = mip.paths.get_source_dir(packageDir, pkgInfo);
     if ~isfolder(srcDir)

@@ -74,8 +74,14 @@ classdef TestUpdateSelf < matlab.unittest.TestCase
                 'version should be replaced with real mip version from channel');
             testCase.verifyEqual(info2.name, 'mip', ...
                 'mip.json name should be "mip"');
-            testCase.verifyTrue(exist(fullfile(pkgDir, 'load_package.m'), 'file') > 0, ...
-                'downloaded mip payload should contain load_package.m');
+            % The downloaded payload is driven by whatever the published
+            % mhl contains -- either a legacy load_package.m or, once the
+            % channel is republished under the new scheme, a "paths" field
+            % in mip.json. Accept either.
+            hasLoadScript = exist(fullfile(pkgDir, 'load_package.m'), 'file') > 0;
+            hasPathsField = isfield(info2, 'paths');
+            testCase.verifyTrue(hasLoadScript || hasPathsField, ...
+                'downloaded mip payload should expose load_package.m or mip.json "paths"');
         end
 
     end

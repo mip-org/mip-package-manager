@@ -33,6 +33,10 @@ end
 
 mipData.dependencies = mipConfig.dependencies;
 
+if isfield(opts, 'paths')
+    mipData.paths = ensureCellColumn(opts.paths);
+end
+
 if isfield(mipConfig, 'license')
     mipData.license = mipConfig.license;
 else
@@ -94,4 +98,17 @@ end
 fwrite(fid, jsonText);
 fclose(fid);
 
+end
+
+
+function out = ensureCellColumn(paths)
+% Normalize paths to a cell-array column so jsonencode always produces a
+% JSON array (even for 0 or 1 entries).
+    if isempty(paths)
+        out = reshape({}, 0, 1);
+    elseif ischar(paths)
+        out = {paths};
+    else
+        out = reshape(paths, [], 1);
+    end
 end
