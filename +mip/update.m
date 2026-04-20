@@ -542,12 +542,51 @@ function updateSelf(p, force)
         mhlPath = mip.channel.download_mhl(latestInfo.mhl_url, tempDir, expectedSha);
         stagingDir = fullfile(tempDir, 'staging');
         mip.channel.extract_mhl(mhlPath, stagingDir);
+
+        % Resolve all path lists BEFORE touching the installed mip. Once
+        % we rmpath+rmdir the old mip, the mip.* helpers are no longer
+        % reachable, so everything we need from them must be computed now.
+        oldPathsToRemove = {};
+        if isfield(pkgInfo, 'paths')
+            oldSrcDir = mip.paths.get_source_dir(pkgDir, pkgInfo);
+            oldPathsToRemove = resolvePathList(oldSrcDir, pkgInfo.paths);
+        end
+
+        % New package info is read from staging. After movefile, the
+        % staging layout ends up at pkgDir, so source paths resolve under
+        % pkgDir/<name>/.
+        newPkgInfo = mip.config.read_package_json(stagingDir);
+        newPathsToAdd = {};
+        if isfield(newPkgInfo, 'paths')
+            newSrcDir = fullfile(pkgDir, newPkgInfo.name);
+            newPathsToAdd = resolvePathList(newSrcDir, newPkgInfo.paths);
+        end
+
+        % Unload the currently installed mip. Prefer the legacy
+        % unload_package.m when present; otherwise rmpath the entries
+        % declared in the old mip.json "paths" field.
         unloadScript = fullfile(pkgDir, 'unload_package.m');
         if exist(unloadScript, 'file')
             run(unloadScript);
+        else
+            oldWarn = warning('off', 'MATLAB:rmpath:DirNotFound');
+            for k = 1:length(oldPathsToRemove)
+                rmpath(oldPathsToRemove{k});
+            end
+            warning(oldWarn);
         end
         rmdir(pkgDir, 's');
         movefile(stagingDir, pkgDir);
+
+        % Reload mip: addpath new entries (these now point into the
+        % just-moved pkgDir), then run legacy load_package.m if present.
+        for k = 1:length(newPathsToAdd)
+            addpath(newPathsToAdd{k});
+        end
+        loadScript = fullfile(pkgDir, 'load_package.m');
+        if exist(loadScript, 'file')
+            run(loadScript);
+        end
         fprintf('Successfully updated mip to %s\n', latestInfo.version);
     catch ME
         if exist(tempDir, 'dir')
@@ -559,13 +598,19 @@ function updateSelf(p, force)
     if exist(tempDir, 'dir')
         rmdir(tempDir, 's');
     end
-
-    % Reload mip
-    loadScript = fullfile(pkgDir, 'load_package.m');
-    if exist(loadScript, 'file')
-        run(loadScript);
-    end
     fprintf('\nmip has been updated to %s.\n', latestInfo.version);
+end
+
+function out = resolvePathList(srcDir, relPaths)
+% Resolve each entry in relPaths (relative to srcDir) to an absolute path.
+    out = cell(1, length(relPaths));
+    for i = 1:length(relPaths)
+        if strcmp(relPaths{i}, '.')
+            out{i} = srcDir;
+        else
+            out{i} = fullfile(srcDir, relPaths{i});
+        end
+    end
 end
 
 function expanded = expandWithDeps(args)

@@ -58,20 +58,20 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             testCase.verifyTrue(info.editable);
         end
 
-        function testEditableInstall_CreatesLoadScript(testCase)
+        function testEditableInstall_RecordsPathsInMipJson(testCase)
+            % New-style installs carry the paths list inside mip.json and
+            % no longer emit load_package.m / unload_package.m scripts.
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install('-e', srcDir);
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
-            testCase.verifyTrue(exist(fullfile(pkgDir, 'load_package.m'), 'file') > 0);
-        end
-
-        function testEditableInstall_CreatesUnloadScript(testCase)
-            srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
-            mip.install('-e', srcDir);
-
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
-            testCase.verifyTrue(exist(fullfile(pkgDir, 'unload_package.m'), 'file') > 0);
+            info = mip.config.read_package_json(pkgDir);
+            testCase.verifyTrue(isfield(info, 'paths'), ...
+                'Editable install should record "paths" in mip.json');
+            testCase.verifyFalse(exist(fullfile(pkgDir, 'load_package.m'), 'file') > 0, ...
+                'Editable install should no longer generate load_package.m');
+            testCase.verifyFalse(exist(fullfile(pkgDir, 'unload_package.m'), 'file') > 0, ...
+                'Editable install should no longer generate unload_package.m');
         end
 
         function testEditableInstall_MarkedAsDirectlyInstalled(testCase)
@@ -82,15 +82,22 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             testCase.verifyTrue(ismember('local/local/mypkg', pkgs));
         end
 
-        function testEditableInstall_LoadScriptUsesAbsolutePaths(testCase)
+        function testEditableInstall_LoadResolvesToSourceDir(testCase)
+            % Editable installs resolve "paths" against source_path (the
+            % original source dir), giving the same effect the old
+            % absolute-path load_package.m provided.
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install('-e', srcDir);
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
-            loadScript = fileread(fullfile(pkgDir, 'load_package.m'));
-            % Load script should contain absolute path to source
-            testCase.verifyTrue(contains(loadScript, srcDir), ...
-                'Load script should reference source directory with absolute path');
+            info = mip.config.read_package_json(pkgDir);
+            testCase.verifyTrue(info.editable);
+            testCase.verifyEqual(info.source_path, srcDir);
+
+            % After loading, the source dir itself should be on the MATLAB path.
+            mip.load('mypkg');
+            testCase.addTeardown(@() mip.unload('mypkg'));
+            testCase.verifyTrue(ismember(srcDir, strsplit(path, pathsep)));
         end
 
         function testEditableInstall_MipJsonHasSourcePath(testCase)
@@ -135,15 +142,25 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             testCase.verifyEqual(info.name, 'mypkg');
         end
 
-        function testCopyInstall_LoadScriptUsesRelativePaths(testCase)
+        function testCopyInstall_LoadResolvesToInstalledSourceDir(testCase)
+            % Copy installs resolve "paths" against pkgDir/<name>/ (the
+            % installed source subdir), independent of the original
+            % source location.
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install(srcDir);
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
-            loadScript = fileread(fullfile(pkgDir, 'load_package.m'));
-            % Copy install load script should use relative paths (pkg_dir)
-            testCase.verifyTrue(contains(loadScript, 'pkg_dir'), ...
-                'Copy install load script should use relative paths');
+            info = mip.config.read_package_json(pkgDir);
+            testCase.verifyTrue(isfield(info, 'paths'), ...
+                'Copy install should record "paths" in mip.json');
+            testCase.verifyFalse(isfield(info, 'editable') && info.editable);
+
+            expectedSrcDir = fullfile(pkgDir, 'mypkg');
+            mip.load('mypkg');
+            testCase.addTeardown(@() mip.unload('mypkg'));
+            testCase.verifyTrue(ismember(expectedSrcDir, strsplit(path, pathsep)));
+            testCase.verifyFalse(ismember(srcDir, strsplit(path, pathsep)), ...
+                'Copy install should not put the original source dir on the path');
         end
 
         function testInstallLocal_WithDependency(testCase)

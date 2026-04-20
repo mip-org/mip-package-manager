@@ -164,7 +164,7 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
         end
         % Apply --addpath/--rmpath even when already loaded so the user
         % can adjust the path of an existing load without re-loading.
-        applyPathAdjustments(packageDir, fqn, addPathRels, rmPathRels);
+        applyPathAdjustments(packageDir, addPathRels, rmPathRels);
         return
     end
 
@@ -173,6 +173,7 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
     % instead of being silently downgraded to a warning.
     mipJsonPath = fullfile(packageDir, 'mip.json');
     deps = {};
+    mipConfig = [];
     if exist(mipJsonPath, 'file')
         try
             mipConfig = mip.config.read_package_json(packageDir);
@@ -198,34 +199,49 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
         end
     end
 
-    % Look for load_package.m file
+    % Add paths from mip.json (new-style packages). Legacy packages that
+    % predate the paths field omit it entirely; they rely on
+    % load_package.m below instead.
+    hasPathsField = ~isempty(mipConfig) && isfield(mipConfig, 'paths');
+    if hasPathsField
+        applyMipJsonPaths(packageDir, mipConfig);
+    end
+
+    % Look for load_package.m file (legacy support; also allowed alongside
+    % the paths field for packages that need custom init logic).
     loadFile = fullfile(packageDir, 'load_package.m');
-    if ~exist(loadFile, 'file')
+    hasLoadScript = exist(loadFile, 'file') ~= 0;
+
+    if ~hasPathsField && ~hasLoadScript
         error('mip:loadNotFound', ...
-              'Package "%s" does not have a load_package.m file', fqn);
+              ['Package "%s" has no "paths" field in mip.json and no ' ...
+               'load_package.m file'], fqn);
     end
 
     % Execute the load_package.m file. If it errors, the package is NOT
     % marked as loaded, so the user can fix the issue and retry. We do not
     % attempt to roll back any path or state changes that load_package.m
-    % may have made before failing -- doing so reliably is not possible.
-    originalDir = pwd;
-    restoreDir = onCleanup(@() cd(originalDir));
-    cd(packageDir);
-    try
-        run(loadFile);
-    catch ME
-        loadErr = MException('mip:loadError', ...
-            'Error executing load_package.m for package "%s": %s', ...
-            fqn, ME.message);
-        loadErr = addCause(loadErr, ME);
-        throw(loadErr);
+    % (or the paths field above) may have made before failing -- doing so
+    % reliably is not possible.
+    if hasLoadScript
+        originalDir = pwd;
+        restoreDir = onCleanup(@() cd(originalDir));
+        cd(packageDir);
+        try
+            run(loadFile);
+        catch ME
+            loadErr = MException('mip:loadError', ...
+                'Error executing load_package.m for package "%s": %s', ...
+                fqn, ME.message);
+            loadErr = addCause(loadErr, ME);
+            throw(loadErr);
+        end
+        clear restoreDir;
     end
-    clear restoreDir;
     fprintf('Loaded package "%s"\n', fqn);
 
     % Apply --addpath / --rmpath after load_package.m has run.
-    applyPathAdjustments(packageDir, fqn, addPathRels, rmPathRels);
+    applyPathAdjustments(packageDir, addPathRels, rmPathRels);
 
     % Mark package as loaded
     mip.state.key_value_append('MIP_LOADED_PACKAGES', fqn);
@@ -242,7 +258,26 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
     end
 end
 
-function applyPathAdjustments(packageDir, fqn, addPathRels, rmPathRels)
+function applyMipJsonPaths(packageDir, pkgInfo)
+% addpath each entry in pkgInfo.paths against the package source
+% directory. Silent on success -- the "Loaded package" summary is
+% printed by the caller.
+    if isempty(pkgInfo.paths)
+        return
+    end
+    srcDir = mip.paths.get_source_dir(packageDir, pkgInfo);
+    for i = 1:length(pkgInfo.paths)
+        rel = pkgInfo.paths{i};
+        if strcmp(rel, '.')
+            target = srcDir;
+        else
+            target = fullfile(srcDir, rel);
+        end
+        addpath(target);
+    end
+end
+
+function applyPathAdjustments(packageDir, addPathRels, rmPathRels)
 % Apply --addpath / --rmpath relative to the package's source directory.
 % No-op if both lists are empty.
 
