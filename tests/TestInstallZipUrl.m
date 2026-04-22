@@ -186,6 +186,30 @@ classdef TestInstallZipUrl < matlab.unittest.TestCase
             end
         end
 
+        function testWebUrl_E2EInstall(testCase)
+            % End-to-end install from a generic (non-FEX) .zip URL. Uses a
+            % GitHub archive zip as a benign test target. Verifies the
+            % package lands under web/ (not fex/) — i.e. the fex/web split
+            % routes non-FEX URLs correctly. Silently returns under
+            % MIP_SKIP_REMOTE.
+            if ~isempty(getenv('MIP_SKIP_REMOTE'))
+                return;
+            end
+            zipUrl = ['https://github.com/altmany/export_fig/archive/' ...
+                      'refs/heads/master.zip'];
+            mip.install('web_export_fig_test', '--url', zipUrl);
+
+            installedDir = fullfile(testCase.TestRoot, 'packages', ...
+                                    'web', 'web_export_fig_test');
+            testCase.verifyTrue(exist(installedDir, 'dir') > 0, ...
+                'Non-FEX zip URL should install under web/');
+
+            fexDir = fullfile(testCase.TestRoot, 'packages', ...
+                              'fex', 'web_export_fig_test');
+            testCase.verifyFalse(exist(fexDir, 'dir') > 0, ...
+                'Non-FEX zip URL should not install under fex/');
+        end
+
         function testFexUrl_E2EInstall(testCase)
             % End-to-end install from a real File Exchange URL. Uses
             % shadedErrorBar (a small, widely-used plotting utility) as

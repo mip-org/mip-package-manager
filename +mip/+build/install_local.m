@@ -21,6 +21,13 @@ if nargin < 4
     sourceType = 'local';
 end
 
+validSourceTypes = {'local', 'fex', 'web'};
+if ~ismember(sourceType, validSourceTypes)
+    error('mip:install:invalidSourceType', ...
+          'Invalid sourceType "%s". Must be one of: %s.', ...
+          sourceType, strjoin(validSourceTypes, ', '));
+end
+
 % Resolve to absolute path
 sourceDir = mip.paths.get_absolute_path(sourceDir);
 

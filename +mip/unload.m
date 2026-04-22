@@ -284,13 +284,7 @@ function pruneUnusedPackages()
         fprintf('Pruning unnecessary packages: %s\n', strjoin(displayPrune, ', '));
         for i = 1:length(packagesToPrune)
             pkg = packagesToPrune{i};
-            r = mip.parse.parse_package_arg(pkg);
-            if r.is_fqn
-                packageDir = mip.paths.get_package_dir(pkg);
-            else
-                continue  % Skip non-FQN entries (shouldn't happen)
-            end
-
+            packageDir = mip.paths.get_package_dir(pkg);
             executeUnload(packageDir, pkg);
             mip.state.key_value_remove('MIP_LOADED_PACKAGES', pkg);
             fprintf('  Pruned package "%s"\n', mip.parse.display_fqn(pkg));
@@ -352,12 +346,7 @@ function unloadAll(forceUnload)
     % Unload each package
     for i = 1:length(packagesToUnload)
         pkg = packagesToUnload{i};
-        r = mip.parse.parse_package_arg(pkg);
-        if r.is_fqn
-            packageDir = mip.paths.get_package_dir(pkg);
-        else
-            packageDir = fullfile(mip.paths.get_packages_dir(), pkg);
-        end
+        packageDir = mip.paths.get_package_dir(pkg);
         executeUnload(packageDir, pkg);
         fprintf('  Unloaded package "%s"\n', mip.parse.display_fqn(pkg));
     end

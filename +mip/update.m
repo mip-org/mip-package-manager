@@ -299,7 +299,7 @@ function p = resolvePackage(packageArg)
         pkgInfo = struct('version', 'unknown', 'name', r.name);
     end
 
-    % "Local" here means any non-gh source type (local or fex). Update
+    % "Local" here means any non-gh source type (local, fex, or web). Update
     % treats them the same way: reinstall from source rather than from a
     % channel index.
     isLocal = ~strcmp(r.type, 'gh');
