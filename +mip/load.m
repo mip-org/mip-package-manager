@@ -118,15 +118,18 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
         end
     end
 
-    % mip-org/core/mip is always loaded — nothing to do
-    if strcmp(fqn, 'mip-org/core/mip')
+    % gh/mip-org/core/mip is always loaded — nothing to do
+    if strcmp(fqn, 'gh/mip-org/core/mip')
         fprintf('Package "mip" is always loaded\n');
         return
     end
 
+    displayFqn = mip.parse.display_fqn(fqn);
+
     % Check for circular dependencies
     if ismember(fqn, loadingStack)
-        cycle = strjoin([loadingStack, {fqn}], ' -> ');
+        cycleDisplay = cellfun(@mip.parse.display_fqn, [loadingStack, {fqn}], 'UniformOutput', false);
+        cycle = strjoin(cycleDisplay, ' -> ');
         error('mip:circularDependency', ...
               'Circular dependency detected: %s', cycle);
     end
@@ -134,15 +137,14 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
     % Add to loading stack for circular dependency detection
     loadingStack = [loadingStack, {fqn}];
 
-    % Parse FQN to get package directory
-    result = mip.parse.parse_package_arg(fqn);
-    packageDir = mip.paths.get_package_dir(result.org, result.channel, result.name);
+    % Compute package directory from the canonical FQN
+    packageDir = mip.paths.get_package_dir(fqn);
 
     % Check if package exists
     if ~mip.state.is_installed(fqn)
         error('mip:packageNotFound', ...
               'Package "%s" is not installed. Run "mip install %s" first.', ...
-              fqn, fqn);
+              displayFqn, displayFqn);
     end
 
     % Check if package is already loaded
@@ -151,15 +153,15 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
         % loaded as a dependency, mark it as direct now
         if isDirect && ~mip.state.is_directly_loaded(fqn)
             mip.state.key_value_append('MIP_DIRECTLY_LOADED_PACKAGES', fqn);
-            fprintf('Package "%s" is already loaded (now marked as direct)\n', fqn);
+            fprintf('Package "%s" is already loaded (now marked as direct)\n', displayFqn);
         else
-            fprintf('Package "%s" is already loaded\n', fqn);
+            fprintf('Package "%s" is already loaded\n', displayFqn);
         end
         % If --sticky was specified, add to sticky packages
         if stickyPackage
             if ~mip.state.is_sticky(fqn)
                 mip.state.key_value_append('MIP_STICKY_PACKAGES', fqn);
-                fprintf('Package "%s" is now sticky\n', fqn);
+                fprintf('Package "%s" is now sticky\n', displayFqn);
             end
         end
         % Apply --addpath/--rmpath even when already loaded so the user
@@ -181,20 +183,20 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
         catch ME
             warning('mip:jsonParseError', ...
                     'Could not parse mip.json for package "%s": %s', ...
-                    fqn, ME.message);
+                    displayFqn, ME.message);
         end
     end
 
     if ~isempty(deps)
         fprintf('Loading dependencies for "%s": %s\n', ...
-                fqn, strjoin(deps, ', '));
+                displayFqn, strjoin(deps, ', '));
         for i = 1:length(deps)
             dep = deps{i};
             depFqn = mip.resolve.resolve_dependency(dep);
             if ~mip.state.is_loaded(depFqn)
                 loadSingle(depFqn, installIfMissing, false, channel, false, loadingStack, {}, {});
             else
-                fprintf('  Dependency "%s" is already loaded\n', depFqn);
+                fprintf('  Dependency "%s" is already loaded\n', mip.parse.display_fqn(depFqn));
             end
         end
     end
@@ -215,7 +217,7 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
     if ~hasPathsField && ~hasLoadScript
         error('mip:loadNotFound', ...
               ['Package "%s" has no "paths" field in mip.json and no ' ...
-               'load_package.m file'], fqn);
+               'load_package.m file'], displayFqn);
     end
 
     % Execute the load_package.m file. If it errors, the package is NOT
@@ -232,13 +234,13 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
         catch ME
             loadErr = MException('mip:loadError', ...
                 'Error executing load_package.m for package "%s": %s', ...
-                fqn, ME.message);
+                displayFqn, ME.message);
             loadErr = addCause(loadErr, ME);
             throw(loadErr);
         end
         clear restoreDir;
     end
-    fprintf('Loaded package "%s"\n', fqn);
+    fprintf('Loaded package "%s"\n', displayFqn);
 
     % Apply --addpath / --rmpath after load_package.m has run.
     applyPathAdjustments(packageDir, addPathRels, rmPathRels);
@@ -254,7 +256,7 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
     % Mark package as sticky if requested
     if stickyPackage
         mip.state.key_value_append('MIP_STICKY_PACKAGES', fqn);
-        fprintf('Package "%s" is now sticky\n', fqn);
+        fprintf('Package "%s" is now sticky\n', displayFqn);
     end
 end
 
@@ -317,13 +319,17 @@ function fqn = resolveToFqn(packageArg)
         % dash/underscore-insensitive) so the rest of load uses the
         % canonical form, matching what's already in the loaded/sticky
         % state lists.
-        onDisk = mip.resolve.installed_dir(result.org, result.channel, result.name);
+        onDisk = mip.resolve.installed_dir(result.fqn);
         if isempty(onDisk)
             error('mip:packageNotFound', ...
                   'Package "%s" is not installed. Run "mip install %s" first.', ...
                   packageArg, packageArg);
         end
-        fqn = mip.parse.make_fqn(result.org, result.channel, onDisk);
+        if strcmp(result.type, 'gh')
+            fqn = mip.parse.make_fqn(result.org, result.channel, onDisk);
+        else
+            fqn = [result.type '/' onDisk];
+        end
     else
         % Resolve bare name to installed FQN
         fqn = mip.resolve.resolve_bare_name(result.name);

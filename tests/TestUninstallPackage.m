@@ -46,11 +46,11 @@ classdef TestUninstallPackage < matlab.unittest.TestCase
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'testpkg');
             mip.state.add_directly_installed('mip-org/core/testpkg');
 
-            testCase.verifyTrue(ismember('mip-org/core/testpkg', ...
+            testCase.verifyTrue(ismember('gh/mip-org/core/testpkg', ...
                 mip.state.get_directly_installed()));
 
             mip.state.remove_directly_installed('mip-org/core/testpkg');
-            testCase.verifyFalse(ismember('mip-org/core/testpkg', ...
+            testCase.verifyFalse(ismember('gh/mip-org/core/testpkg', ...
                 mip.state.get_directly_installed()));
         end
 
@@ -70,9 +70,9 @@ classdef TestUninstallPackage < matlab.unittest.TestCase
         function testPackageNoLongerDiscoverableAfterRemoval(testCase)
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'testpkg');
             fqn = mip.resolve.resolve_bare_name('testpkg');
-            testCase.verifyEqual(fqn, 'mip-org/core/testpkg');
+            testCase.verifyEqual(fqn, 'gh/mip-org/core/testpkg');
 
-            pkgDir = mip.paths.get_package_dir('mip-org', 'core', 'testpkg');
+            pkgDir = mip.paths.get_package_dir('mip-org/core/testpkg');
             rmdir(pkgDir, 's');
 
             fqn = mip.resolve.resolve_bare_name('testpkg');
@@ -81,8 +81,8 @@ classdef TestUninstallPackage < matlab.unittest.TestCase
 
         function testCleanupEmptyParentDirs(testCase)
             pkgDir = createTestPackage(testCase.TestRoot, 'testorg', 'testchan', 'testpkg');
-            chanDir = fullfile(testCase.TestRoot, 'packages', 'testorg', 'testchan');
-            orgDir = fullfile(testCase.TestRoot, 'packages', 'testorg');
+            chanDir = fullfile(testCase.TestRoot, 'packages', 'gh', 'testorg', 'testchan');
+            orgDir = fullfile(testCase.TestRoot, 'packages', 'gh', 'testorg');
 
             % Remove the package
             rmdir(pkgDir, 's');
@@ -108,8 +108,8 @@ classdef TestUninstallPackage < matlab.unittest.TestCase
             allMatches = mip.resolve.find_all_installed_by_name('duppkg');
             testCase.verifyEqual(length(allMatches), 2, ...
                 'Should find two installed packages with same bare name');
-            testCase.verifyTrue(ismember('mip-org/core/duppkg', allMatches));
-            testCase.verifyTrue(ismember('other-org/extras/duppkg', allMatches));
+            testCase.verifyTrue(ismember('gh/mip-org/core/duppkg', allMatches));
+            testCase.verifyTrue(ismember('gh/other-org/extras/duppkg', allMatches));
         end
 
         function testUninstallBareNameUnique_ResolvesNormally(testCase)
@@ -118,7 +118,7 @@ classdef TestUninstallPackage < matlab.unittest.TestCase
 
             allMatches = mip.resolve.find_all_installed_by_name('uniqpkg');
             testCase.verifyEqual(length(allMatches), 1);
-            testCase.verifyEqual(allMatches{1}, 'mip-org/core/uniqpkg');
+            testCase.verifyEqual(allMatches{1}, 'gh/mip-org/core/uniqpkg');
         end
 
         function testUninstallFQN_BypassesAmbiguityCheck(testCase)

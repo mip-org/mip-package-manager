@@ -56,7 +56,7 @@ classdef TestInstallPromptInit < matlab.unittest.TestCase
             % mip.yaml created in source
             testCase.verifyTrue(exist(fullfile(pkgDir, 'mip.yaml'), 'file') > 0);
             % Package installed
-            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             testCase.verifyTrue(exist(installedDir, 'dir') > 0);
         end
 
@@ -71,7 +71,7 @@ classdef TestInstallPromptInit < matlab.unittest.TestCase
             mip.install('-e', pkgDir);
 
             testCase.verifyTrue(exist(fullfile(pkgDir, 'mip.yaml'), 'file') > 0);
-            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             testCase.verifyTrue(exist(installedDir, 'dir') > 0);
 
             info = mip.config.read_package_json(installedDir);
@@ -91,7 +91,7 @@ classdef TestInstallPromptInit < matlab.unittest.TestCase
 
             % No mip.yaml created, no install
             testCase.verifyFalse(exist(fullfile(pkgDir, 'mip.yaml'), 'file') > 0);
-            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             testCase.verifyFalse(exist(installedDir, 'dir') > 0);
         end
 
@@ -134,7 +134,7 @@ classdef TestInstallPromptInit < matlab.unittest.TestCase
             setenv('MIP_CONFIRM', 'yes');
             mip.install(pkgDir);
 
-            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             testCase.verifyTrue(exist(installedDir, 'dir') > 0);
         end
 
@@ -146,7 +146,7 @@ classdef TestInstallPromptInit < matlab.unittest.TestCase
             setenv('MIP_CONFIRM', 'n');  % would abort if prompted
             mip.install(pkgDir);
 
-            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             testCase.verifyTrue(exist(installedDir, 'dir') > 0);
         end
 
@@ -163,7 +163,7 @@ classdef TestInstallPromptInit < matlab.unittest.TestCase
             cfg = mip.config.read_mip_yaml(pkgDir);
             testCase.verifyEqual(cfg.name, 'somepkgname');
 
-            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'somepkgname');
+            installedDir = fullfile(testCase.TestRoot, 'packages', 'local', 'somepkgname');
             testCase.verifyTrue(exist(installedDir, 'dir') > 0);
         end
 
@@ -231,8 +231,8 @@ classdef TestInstallPromptInit < matlab.unittest.TestCase
             testCase.verifyTrue(exist(fullfile(pkgA, 'mip.yaml'), 'file') > 0);
             testCase.verifyTrue(exist(fullfile(pkgB, 'mip.yaml'), 'file') > 0);
 
-            installedA = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'pkgA');
-            installedB = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'pkgB');
+            installedA = fullfile(testCase.TestRoot, 'packages', 'local', 'pkgA');
+            installedB = fullfile(testCase.TestRoot, 'packages', 'local', 'pkgB');
             testCase.verifyTrue(exist(installedA, 'dir') > 0);
             testCase.verifyTrue(exist(installedB, 'dir') > 0);
         end

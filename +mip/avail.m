@@ -62,7 +62,7 @@ try
     % Display the list
     fprintf('\nAvailable packages for %s:\n\n', currentArch);
     for i = 1:length(availablePackages)
-        fprintf('  %s\n', availablePackages{i});
+        fprintf('  %s\n', mip.parse.display_fqn(availablePackages{i}));
     end
     fprintf('\n');
 

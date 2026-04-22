@@ -37,16 +37,21 @@ if isempty(channel)
     channel = 'mip-org/core';
 end
 
-[org, channelName, packageName] = mip.resolve.resolve_package_name(packageArg, channel);
-
-% Find all local installations of this package
+% Find all local installations of this package, and collect which channels
+% to query for remote info.
 result = mip.parse.parse_package_arg(packageArg);
+packageName = result.name;
+
 if result.is_fqn
     % FQN: only check that specific installation. Canonicalize the name
     % to the on-disk form so we report and operate on the canonical FQN.
-    onDisk = mip.resolve.installed_dir(org, channelName, packageName);
+    onDisk = mip.resolve.installed_dir(result.fqn);
     if ~isempty(onDisk)
-        installedFqns = {mip.parse.make_fqn(org, channelName, onDisk)};
+        if strcmp(result.type, 'gh')
+            installedFqns = {mip.parse.make_fqn(result.org, result.channel, onDisk)};
+        else
+            installedFqns = {[result.type '/' onDisk]};
+        end
     else
         installedFqns = {};
     end
@@ -57,14 +62,22 @@ end
 
 % ---- Collect channels to query ----
 
-channelsToQuery = {[org '/' channelName]};
+% For a gh FQN, query its specific channel. For bare names and non-gh FQNs,
+% fall back to the --channel flag (default mip-org/core).
+channelsToQuery = {};
+if result.is_fqn && strcmp(result.type, 'gh')
+    channelsToQuery{end+1} = [result.org '/' result.channel]; %#ok<AGROW>
+elseif ~result.is_fqn
+    [chOrg, chName] = mip.parse.parse_channel_spec(channel);
+    channelsToQuery{end+1} = [chOrg '/' chName];
+end
 for i = 1:length(installedFqns)
     r = mip.parse.parse_package_arg(installedFqns{i});
-    ch = [r.org '/' r.channel];
-    % Skip local/local — no remote index for local installs
-    if strcmp(ch, 'local/local')
+    % Skip non-gh packages — no remote channel index exists for them.
+    if ~strcmp(r.type, 'gh')
         continue
     end
+    ch = [r.org '/' r.channel];
     if ~ismember(ch, channelsToQuery)
         channelsToQuery{end+1} = ch; %#ok<AGROW>
     end
@@ -89,9 +102,14 @@ end
 % If the package is not installed locally and not in any remote channel,
 % error before printing anything.
 if isempty(installedFqns) && ~foundRemote
-    error('mip:unknownPackage', ...
-        'Unknown package "%s" in channel "%s".', ...
-        packageName, strjoin(channelsToQuery, '", "'));
+    if isempty(channelsToQuery)
+        error('mip:unknownPackage', ...
+            'Unknown package "%s".', packageName);
+    else
+        error('mip:unknownPackage', ...
+            'Unknown package "%s" in channel "%s".', ...
+            packageName, strjoin(channelsToQuery, '", "'));
+    end
 end
 
 % ---- Section 1: Local installation(s) ----
@@ -121,10 +139,9 @@ end
 function showLocalInstallInfo(fqn)
 % Display info about a single local installation.
 
-    r = mip.parse.parse_package_arg(fqn);
-    pkgDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
+    pkgDir = mip.paths.get_package_dir(fqn);
 
-    fprintf('\n  %s\n', fqn);
+    fprintf('\n  %s\n', mip.parse.display_fqn(fqn));
 
     try
         pkgInfo = mip.config.read_package_json(pkgDir);

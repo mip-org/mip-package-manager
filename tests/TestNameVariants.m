@@ -43,7 +43,7 @@ classdef TestNameVariants < matlab.unittest.TestCase
         end
 
         function fqn = canonicalFqn(~)
-            fqn = 'mip-org/core/My-Pkg';
+            fqn = 'gh/mip-org/core/My-Pkg';
         end
     end
 
@@ -66,24 +66,24 @@ classdef TestNameVariants < matlab.unittest.TestCase
             createTestPackage(testCase.TestRoot, 'mylab', 'custom', 'my_pkg');
             matches = mip.resolve.find_all_installed_by_name('MY-PKG');
             testCase.verifyEqual(sort(matches), ...
-                sort({'mip-org/core/My-Pkg', 'mylab/custom/my_pkg'}));
+                sort({'gh/mip-org/core/My-Pkg', 'gh/mylab/custom/my_pkg'}));
         end
 
         function testGetPackageDir_VariantReturnsOnDiskPath(testCase)
             testCase.makePkg();
-            expected = fullfile(testCase.TestRoot, 'packages', 'mip-org', 'core', 'My-Pkg');
+            expected = fullfile(testCase.TestRoot, 'packages', 'gh', 'mip-org', 'core', 'My-Pkg');
             testCase.verifyEqual( ...
-                mip.paths.get_package_dir('mip-org', 'core', 'my_pkg'), expected);
+                mip.paths.get_package_dir('gh/mip-org/core/my_pkg'), expected);
             testCase.verifyEqual( ...
-                mip.paths.get_package_dir('mip-org', 'core', 'MY-PKG'), expected);
+                mip.paths.get_package_dir('mip-org/core/MY-PKG'), expected);
         end
 
         function testGetPackageDir_NotInstalledFallsBack(testCase)
             % When no install exists, get_package_dir returns the path with
             % the as-typed name (used by install for new packages).
-            expected = fullfile(testCase.TestRoot, 'packages', 'mip-org', 'core', 'NewPkg');
+            expected = fullfile(testCase.TestRoot, 'packages', 'gh', 'mip-org', 'core', 'NewPkg');
             testCase.verifyEqual( ...
-                mip.paths.get_package_dir('mip-org', 'core', 'NewPkg'), expected);
+                mip.paths.get_package_dir('mip-org/core/NewPkg'), expected);
         end
 
         function testResolveToInstalled_FqnVariantReturnsCanonical(testCase)

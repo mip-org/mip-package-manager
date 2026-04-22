@@ -2,13 +2,15 @@ function installed = is_installed(fqn)
 %IS_INSTALLED   Check if a package is installed.
 %
 % Args:
-%   fqn - Fully qualified package name (org/channel/name)
+%   fqn - FQN (canonical or 3-part shorthand, e.g.
+%         'gh/mip-org/core/chebfun', 'mip-org/core/chebfun',
+%         'local/mypkg', 'fex/mypkg')
 %
 % Returns:
 %   installed - True if the package directory exists
 
-result = mip.parse.parse_package_arg(fqn);
-packageDir = mip.paths.get_package_dir(result.org, result.channel, result.name);
+fqn = mip.parse.canonical_fqn(fqn);
+packageDir = mip.paths.get_package_dir(fqn);
 installed = exist(packageDir, 'dir') ~= 0;
 
 end

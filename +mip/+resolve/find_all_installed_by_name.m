@@ -3,11 +3,12 @@ function matches = find_all_installed_by_name(packageName)
 %
 % Matches use the equivalence rules of mip.name.match (case-insensitive,
 % dash/underscore-equivalent). Returned FQNs use the actual on-disk
-% directory name for each match.
+% directory name for each match and include the 'gh/' prefix for
+% GitHub channel packages.
 %
 % Returns:
-%   matches - Cell array of FQN strings for all org/channel combinations
-%             where this name is installed.
+%   matches - Cell array of canonical FQN strings for each source-type /
+%             org / channel combination where this name is installed.
 
 matches = {};
 packagesDir = mip.paths.get_packages_dir();
@@ -15,22 +16,40 @@ if ~exist(packagesDir, 'dir')
     return
 end
 
-orgDirs = dir(packagesDir);
-for i = 1:length(orgDirs)
-    if ~orgDirs(i).isdir || startsWith(orgDirs(i).name, '.')
+topEntries = dir(packagesDir);
+for i = 1:length(topEntries)
+    if ~topEntries(i).isdir || startsWith(topEntries(i).name, '.')
         continue
     end
-    org = orgDirs(i).name;
-    orgPath = fullfile(packagesDir, org);
-    chanDirs = dir(orgPath);
-    for j = 1:length(chanDirs)
-        if ~chanDirs(j).isdir || startsWith(chanDirs(j).name, '.')
-            continue
+    topName = topEntries(i).name;
+    topPath = fullfile(packagesDir, topName);
+
+    if strcmp(topName, 'gh')
+        orgDirs = dir(topPath);
+        for j = 1:length(orgDirs)
+            if ~orgDirs(j).isdir || startsWith(orgDirs(j).name, '.')
+                continue
+            end
+            org = orgDirs(j).name;
+            orgPath = fullfile(topPath, org);
+            chanDirs = dir(orgPath);
+            for k = 1:length(chanDirs)
+                if ~chanDirs(k).isdir || startsWith(chanDirs(k).name, '.')
+                    continue
+                end
+                ch = chanDirs(k).name;
+                candidateFqn = mip.parse.make_fqn(org, ch, packageName);
+                onDisk = mip.resolve.installed_dir(candidateFqn);
+                if ~isempty(onDisk)
+                    matches{end+1} = mip.parse.make_fqn(org, ch, onDisk); %#ok<AGROW>
+                end
+            end
         end
-        ch = chanDirs(j).name;
-        onDisk = mip.resolve.installed_dir(org, ch, packageName);
+    else
+        candidateFqn = [topName '/' packageName];
+        onDisk = mip.resolve.installed_dir(candidateFqn);
         if ~isempty(onDisk)
-            matches{end+1} = mip.parse.make_fqn(org, ch, onDisk); %#ok<AGROW>
+            matches{end+1} = [topName '/' onDisk]; %#ok<AGROW>
         end
     end
 end

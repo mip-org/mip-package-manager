@@ -46,11 +46,11 @@ classdef TestInstallRemoteAdvanced < matlab.unittest.TestCase
             mip.install('mip-org/test-channel1/chain_top');
 
             topDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'chain_top');
+                'gh', 'mip-org', 'test-channel1', 'chain_top');
             midDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'chain_mid');
+                'gh', 'mip-org', 'test-channel1', 'chain_mid');
             endDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'chain_end');
+                'gh', 'mip-org', 'test-channel1', 'chain_end');
 
             testCase.verifyTrue(exist(topDir, 'dir') > 0, ...
                 'chain_top should be installed');
@@ -104,11 +104,11 @@ classdef TestInstallRemoteAdvanced < matlab.unittest.TestCase
             mip.install('mip-org/test-channel2/multi_dep');
 
             multiDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'multi_dep');
+                'gh', 'mip-org', 'test-channel2', 'multi_dep');
             alphaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             betaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'beta');
+                'gh', 'mip-org', 'test-channel2', 'beta');
 
             testCase.verifyTrue(exist(multiDir, 'dir') > 0, ...
                 'multi_dep should be installed');
@@ -134,13 +134,13 @@ classdef TestInstallRemoteAdvanced < matlab.unittest.TestCase
             mip.install('mip-org/test-channel2/diamond_top');
 
             topDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'diamond_top');
+                'gh', 'mip-org', 'test-channel2', 'diamond_top');
             leftDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'diamond_left');
+                'gh', 'mip-org', 'test-channel2', 'diamond_left');
             rightDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'diamond_right');
+                'gh', 'mip-org', 'test-channel2', 'diamond_right');
             betaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'beta');
+                'gh', 'mip-org', 'test-channel2', 'beta');
 
             testCase.verifyTrue(exist(topDir, 'dir') > 0);
             testCase.verifyTrue(exist(leftDir, 'dir') > 0);
@@ -194,16 +194,16 @@ classdef TestInstallRemoteAdvanced < matlab.unittest.TestCase
             mip.install('mip-org/test-channel1/chain_top');
 
             midDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'chain_mid');
+                'gh', 'mip-org', 'test-channel1', 'chain_mid');
             endDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'chain_end');
+                'gh', 'mip-org', 'test-channel1', 'chain_end');
             testCase.verifyTrue(exist(midDir, 'dir') > 0);
             testCase.verifyTrue(exist(endDir, 'dir') > 0);
 
             mip.uninstall('mip-org/test-channel1/chain_top');
 
             topDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'chain_top');
+                'gh', 'mip-org', 'test-channel1', 'chain_top');
             testCase.verifyFalse(exist(topDir, 'dir') > 0, ...
                 'chain_top should be uninstalled');
             testCase.verifyFalse(exist(midDir, 'dir') > 0, ...
@@ -219,7 +219,7 @@ classdef TestInstallRemoteAdvanced < matlab.unittest.TestCase
             mip.install('mip-org/test-channel1/gamma');
 
             alphaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             testCase.verifyTrue(exist(alphaDir, 'dir') > 0);
 
             mip.uninstall('mip-org/test-channel1/delta');
@@ -235,7 +235,7 @@ classdef TestInstallRemoteAdvanced < matlab.unittest.TestCase
             mip.install('mip-org/test-channel1/gamma');
 
             alphaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
 
             mip.uninstall('mip-org/test-channel1/delta', ...
                           'mip-org/test-channel1/gamma');
@@ -252,11 +252,11 @@ classdef TestInstallRemoteAdvanced < matlab.unittest.TestCase
             mip.uninstall('mip-org/test-channel2/diamond_top');
 
             leftDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'diamond_left');
+                'gh', 'mip-org', 'test-channel2', 'diamond_left');
             rightDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'diamond_right');
+                'gh', 'mip-org', 'test-channel2', 'diamond_right');
             betaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'beta');
+                'gh', 'mip-org', 'test-channel2', 'beta');
 
             testCase.verifyFalse(exist(leftDir, 'dir') > 0, ...
                 'diamond_left should be pruned');
@@ -274,7 +274,7 @@ classdef TestInstallRemoteAdvanced < matlab.unittest.TestCase
             mip.uninstall('mip-org/test-channel1/chain_top');
 
             midDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'chain_mid');
+                'gh', 'mip-org', 'test-channel1', 'chain_mid');
             testCase.verifyFalse(exist(midDir, 'dir') > 0);
 
             mip.install('mip-org/test-channel1/chain_top');
@@ -317,9 +317,9 @@ classdef TestInstallRemoteAdvanced < matlab.unittest.TestCase
                         'mip-org/test-channel2/beta');
 
             endDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'chain_end');
+                'gh', 'mip-org', 'test-channel1', 'chain_end');
             betaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'beta');
+                'gh', 'mip-org', 'test-channel2', 'beta');
 
             testCase.verifyTrue(exist(endDir, 'dir') > 0);
             testCase.verifyTrue(exist(betaDir, 'dir') > 0);
@@ -332,11 +332,11 @@ classdef TestInstallRemoteAdvanced < matlab.unittest.TestCase
                         'mip-org/test-channel1/gamma');
 
             alphaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             deltaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'delta');
+                'gh', 'mip-org', 'test-channel1', 'delta');
             gammaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'gamma');
+                'gh', 'mip-org', 'test-channel1', 'gamma');
 
             testCase.verifyTrue(exist(alphaDir, 'dir') > 0, ...
                 'alpha installed as shared dep');

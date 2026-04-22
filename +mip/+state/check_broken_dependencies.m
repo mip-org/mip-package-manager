@@ -27,7 +27,7 @@ for i = 1:length(packages)
         continue
     end
 
-    packageDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
+    packageDir = mip.paths.get_package_dir(pkg);
     mipJsonPath = fullfile(packageDir, 'mip.json');
 
     if ~exist(mipJsonPath, 'file')
@@ -68,8 +68,7 @@ end
 
 function tf = isDependencyUninstalled(dep)
     depFqn = mip.resolve.resolve_dependency(dep);
-    depResult = mip.parse.parse_package_arg(depFqn);
-    depDir = mip.paths.get_package_dir(depResult.org, depResult.channel, depResult.name);
+    depDir = mip.paths.get_package_dir(depFqn);
     tf = ~exist(depDir, 'dir');
 end
 

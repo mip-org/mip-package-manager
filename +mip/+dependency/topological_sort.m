@@ -58,7 +58,7 @@ sortedPackages = {};
                 dep = deps{j};
                 depResult = mip.parse.parse_package_arg(dep);
                 if depResult.is_fqn
-                    depFqn = dep;
+                    depFqn = depResult.fqn;
                 else
                     depFqn = mip.parse.make_fqn('mip-org', 'core', depResult.name);
                 end

@@ -83,8 +83,8 @@ classdef TestInstallEquivalentFqn < matlab.unittest.TestCase
 
             % The pre-existing install is untouched, and no parallel dir
             % was created under the equivalent name.
-            oldPkg = fullfile(testCase.TestRoot, 'packages', 'mylab', 'custom', 'some_package');
-            newPkg = fullfile(testCase.TestRoot, 'packages', 'mylab', 'custom', 'some-packagE');
+            oldPkg = fullfile(testCase.TestRoot, 'packages', 'gh', 'mylab', 'custom', 'some_package');
+            newPkg = fullfile(testCase.TestRoot, 'packages', 'gh', 'mylab', 'custom', 'some-packagE');
             testCase.verifyTrue(exist(oldPkg, 'dir') > 0);
             testCase.verifyFalse(exist(newPkg, 'dir') > 0);
         end

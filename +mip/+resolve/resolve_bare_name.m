@@ -4,8 +4,8 @@ function fqn = resolve_bare_name(packageName)
 % Searches installed packages for a name match under the equivalence
 % rules of mip.name.match (case-insensitive, dash/underscore-equivalent).
 % Resolution priority:
-%   1. mip-org/core (the default channel)
-%   2. First alphabetically by org/channel
+%   1. gh/mip-org/core (the default channel)
+%   2. First alphabetically by FQN
 %
 % The returned FQN uses the actual on-disk directory name, which may
 % differ in case or separators from the input.
@@ -14,7 +14,7 @@ function fqn = resolve_bare_name(packageName)
 %   packageName - Bare package name (e.g. 'chebfun')
 %
 % Returns:
-%   fqn - Fully qualified name, or empty string if not found
+%   fqn - Canonical FQN, or empty string if not found
 
 fqn = '';
 
@@ -23,26 +23,43 @@ if ~exist(packagesDir, 'dir')
     return
 end
 
-% Collect all matches: per channel, do a case-insensitive lookup.
 matches = {};
 
-orgDirs = dir(packagesDir);
-for i = 1:length(orgDirs)
-    if ~orgDirs(i).isdir || startsWith(orgDirs(i).name, '.')
+topEntries = dir(packagesDir);
+for i = 1:length(topEntries)
+    if ~topEntries(i).isdir || startsWith(topEntries(i).name, '.')
         continue
     end
-    org = orgDirs(i).name;
-    orgPath = fullfile(packagesDir, org);
+    topName = topEntries(i).name;
+    topPath = fullfile(packagesDir, topName);
 
-    chanDirs = dir(orgPath);
-    for j = 1:length(chanDirs)
-        if ~chanDirs(j).isdir || startsWith(chanDirs(j).name, '.')
-            continue
+    if strcmp(topName, 'gh')
+        orgDirs = dir(topPath);
+        for j = 1:length(orgDirs)
+            if ~orgDirs(j).isdir || startsWith(orgDirs(j).name, '.')
+                continue
+            end
+            org = orgDirs(j).name;
+            orgPath = fullfile(topPath, org);
+
+            chanDirs = dir(orgPath);
+            for k = 1:length(chanDirs)
+                if ~chanDirs(k).isdir || startsWith(chanDirs(k).name, '.')
+                    continue
+                end
+                ch = chanDirs(k).name;
+                candidateFqn = mip.parse.make_fqn(org, ch, packageName);
+                onDisk = mip.resolve.installed_dir(candidateFqn);
+                if ~isempty(onDisk)
+                    matches{end+1} = mip.parse.make_fqn(org, ch, onDisk); %#ok<AGROW>
+                end
+            end
         end
-        ch = chanDirs(j).name;
-        onDisk = mip.resolve.installed_dir(org, ch, packageName);
+    else
+        candidateFqn = [topName '/' packageName];
+        onDisk = mip.resolve.installed_dir(candidateFqn);
         if ~isempty(onDisk)
-            matches{end+1} = mip.parse.make_fqn(org, ch, onDisk); %#ok<AGROW>
+            matches{end+1} = [topName '/' onDisk]; %#ok<AGROW>
         end
     end
 end
@@ -51,15 +68,14 @@ if isempty(matches)
     return
 end
 
-% Priority: mip-org/core first
+% Priority: gh/mip-org/core first
 for i = 1:length(matches)
-    if startsWith(matches{i}, 'mip-org/core/')
+    if startsWith(matches{i}, 'gh/mip-org/core/')
         fqn = matches{i};
         return
     end
 end
 
-% Otherwise, first alphabetically
 matches = sort(matches);
 fqn = matches{1};
 

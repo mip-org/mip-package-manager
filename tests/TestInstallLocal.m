@@ -41,7 +41,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install('-e', srcDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0, ...
                 'Package directory should be created');
         end
@@ -50,7 +50,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install('-e', srcDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             testCase.verifyTrue(exist(fullfile(pkgDir, 'mip.json'), 'file') > 0);
 
             info = mip.config.read_package_json(pkgDir);
@@ -64,7 +64,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install('-e', srcDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyTrue(isfield(info, 'paths'), ...
                 'Editable install should record "paths" in mip.json');
@@ -79,7 +79,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             mip.install('-e', srcDir);
 
             pkgs = mip.state.get_directly_installed();
-            testCase.verifyTrue(ismember('local/local/mypkg', pkgs));
+            testCase.verifyTrue(ismember('local/mypkg', pkgs));
         end
 
         function testEditableInstall_LoadResolvesToSourceDir(testCase)
@@ -89,7 +89,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install('-e', srcDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyTrue(info.editable);
             testCase.verifyEqual(info.source_path, srcDir);
@@ -104,7 +104,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install('-e', srcDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyTrue(isfield(info, 'source_path'));
             testCase.verifyTrue(contains(info.source_path, testCase.SourceDir));
@@ -115,7 +115,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             mip.install('-e', srcDir);
 
             pkgs = mip.state.list_installed_packages();
-            testCase.verifyTrue(ismember('local/local/mypkg', pkgs));
+            testCase.verifyTrue(ismember('local/mypkg', pkgs));
         end
 
         function testEditableInstall_AlreadyInstalled(testCase)
@@ -129,7 +129,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install(srcDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0);
         end
 
@@ -137,7 +137,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install(srcDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyEqual(info.name, 'mypkg');
         end
@@ -149,7 +149,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install(srcDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyTrue(isfield(info, 'paths'), ...
                 'Copy install should record "paths" in mip.json');
@@ -171,7 +171,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
                 'dependencies', {'depA'});
             mip.install('-e', srcDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0);
         end
 
@@ -197,7 +197,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'mypkg');
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             output = evalc('mip.install(''-e'', srcDir)');
-            testCase.verifyTrue(contains(output, 'mip load local/local/mypkg'), ...
+            testCase.verifyTrue(contains(output, 'mip load local/mypkg'), ...
                 'Should show FQN in load hint when name is not unique');
         end
 
@@ -213,7 +213,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install(srcDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyTrue(isfield(info, 'source_path'), ...
                 'Non-editable local install should store source_path in mip.json');
@@ -225,7 +225,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install('-e', srcDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyTrue(isfield(info, 'source_path'));
             testCase.verifyTrue(contains(info.source_path, testCase.SourceDir));
@@ -267,7 +267,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
 
             mip.install('./mypkg');
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0, ...
                 './mypkg should install locally');
             testCase.verifyTrue(exist(srcDir, 'dir') > 0);
@@ -350,7 +350,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
 
             mip.install('./pkg@dev');
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'mypkg');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0, ...
                 'Package from @-containing directory should be installed');
         end
@@ -371,7 +371,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
 
             mip.install('-e', atDir);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'myclass');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'myclass');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0, ...
                 'Editable install from @-directory should succeed');
             info = mip.config.read_package_json(pkgDir);

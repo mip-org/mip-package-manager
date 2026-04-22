@@ -17,7 +17,7 @@ if ~result.is_fqn
     return
 end
 
-packageDir = mip.paths.get_package_dir(result.org, result.channel, result.name);
+packageDir = mip.paths.get_package_dir(fqn);
 mipJsonPath = fullfile(packageDir, 'mip.json');
 
 if ~exist(mipJsonPath, 'file')

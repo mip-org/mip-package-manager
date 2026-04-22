@@ -23,6 +23,11 @@ end
 result = mip.parse.parse_package_arg(packageArg);
 
 if result.is_fqn
+    if ~strcmp(result.type, 'gh')
+        error('mip:invalidPackageSpec', ...
+              ['Package "%s" is not a GitHub channel package; only "gh/" ' ...
+               'packages can be installed from a channel.'], packageArg);
+    end
     org = result.org;
     channelName = result.channel;
     name = result.name;

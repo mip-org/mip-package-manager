@@ -20,7 +20,7 @@ for i = 1:length(allInstalled)
     end
 end
 if count > 1
-    name = fqn;
+    name = mip.parse.display_fqn(fqn);
 else
     name = result.name;
 end

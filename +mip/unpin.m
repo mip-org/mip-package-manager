@@ -23,11 +23,12 @@ function unpin(varargin)
                   'Package "%s" is not installed.', packageArg);
         end
 
+        displayFqn = mip.parse.display_fqn(r.fqn);
         if ~mip.state.is_pinned(r.fqn)
-            fprintf('Package "%s" is not pinned.\n', r.fqn);
+            fprintf('Package "%s" is not pinned.\n', displayFqn);
         else
             mip.state.remove_pinned(r.fqn);
-            fprintf('Unpinned "%s".\n', r.fqn);
+            fprintf('Unpinned "%s".\n', displayFqn);
         end
     end
 end

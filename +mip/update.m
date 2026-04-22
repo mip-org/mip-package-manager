@@ -79,7 +79,7 @@ function update(varargin)
             filtered = {};
             for i = 1:length(allInstalled)
                 if mip.state.is_pinned(allInstalled{i})
-                    fprintf('Skipping pinned package "%s".\n', allInstalled{i});
+                    fprintf('Skipping pinned package "%s".\n', mip.parse.display_fqn(allInstalled{i}));
                 else
                     filtered{end+1} = allInstalled{i}; %#ok<AGROW>
                 end
@@ -115,7 +115,7 @@ function update(varargin)
     for i = 1:length(resolved)
         p = resolved{i};
         if p.noSource
-            fprintf('Skipping "%s": no local source to update from.\n', p.fqn);
+            fprintf('Skipping "%s": no local source to update from.\n', mip.parse.display_fqn(p.fqn));
         else
             toProcess{end+1} = p; %#ok<AGROW>
         end
@@ -132,16 +132,16 @@ function update(varargin)
             if ~(p.isLocal && p.editable)
                 error('mip:update:noCompileRequiresEditable', ...
                       '--no-compile can only be used when all updated packages are editable local installs (offending package: "%s").', ...
-                      p.fqn);
+                      mip.parse.display_fqn(p.fqn));
             end
         end
     end
 
-    % Handle self-update (`mip-org/core/mip`) separately and remove it
+    % Handle self-update (`gh/mip-org/core/mip`) separately and remove it
     % from the batch. mip cannot be uninstalled through the normal flow.
     keepMask = true(1, length(toProcess));
     for i = 1:length(toProcess)
-        if strcmp(toProcess{i}.fqn, 'mip-org/core/mip')
+        if strcmp(toProcess{i}.fqn, 'gh/mip-org/core/mip')
             updateSelf(toProcess{i}, force);
             keepMask(i) = false;
         end
@@ -199,10 +199,11 @@ function update(varargin)
         % that a failure in install_local does not destroy the installed copy.
         for i = 1:length(localPkgs)
             p = localPkgs{i};
-            fprintf('Updating local package "%s"...\n', p.fqn);
+            displayFqn = mip.parse.display_fqn(p.fqn);
+            fprintf('Updating local package "%s"...\n', displayFqn);
 
             if mip.state.is_loaded(p.fqn)
-                fprintf('Unloading "%s" before update...\n', p.fqn);
+                fprintf('Unloading "%s" before update...\n', displayFqn);
                 mip.unload(p.fqn);
             end
 
@@ -211,12 +212,11 @@ function update(varargin)
             movefile(p.pkgDir, backupDir);
             mip.state.remove_directly_installed(p.fqn);
             packagesDir = mip.paths.get_packages_dir();
-            mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'local', 'local'));
-            mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'local'));
+            mip.paths.cleanup_empty_dirs(fullfile(packagesDir, p.type));
 
-            fprintf('Reinstalling "%s" from %s...\n', p.fqn, p.sourcePath);
+            fprintf('Reinstalling "%s" from %s...\n', displayFqn, p.sourcePath);
             try
-                mip.build.install_local(p.sourcePath, p.editable, noCompile);
+                mip.build.install_local(p.sourcePath, p.editable, noCompile, p.type);
             catch ME
                 % Restore old package on failure
                 parentDir = fileparts(p.pkgDir);
@@ -234,7 +234,7 @@ function update(varargin)
             % Unpin if this was a forced update of a pinned package
             if force && mip.state.is_pinned(p.fqn)
                 mip.state.remove_pinned(p.fqn);
-                fprintf('Unpinned "%s".\n', p.fqn);
+                fprintf('Unpinned "%s".\n', displayFqn);
             end
         end
 
@@ -246,8 +246,9 @@ function update(varargin)
         if ~isempty(remotePkgs)
             for i = 1:length(remotePkgs)
                 p = remotePkgs{i};
+                displayFqn = mip.parse.display_fqn(p.fqn);
                 if mip.state.is_loaded(p.fqn)
-                    fprintf('Unloading "%s" before update...\n', p.fqn);
+                    fprintf('Unloading "%s" before update...\n', displayFqn);
                     mip.unload(p.fqn);
                 end
                 downloadAndReplace(p);
@@ -255,7 +256,7 @@ function update(varargin)
                 % Unpin if this was a forced update of a pinned package
                 if force && mip.state.is_pinned(p.fqn)
                     mip.state.remove_pinned(p.fqn);
-                    fprintf('Unpinned "%s".\n', p.fqn);
+                    fprintf('Unpinned "%s".\n', displayFqn);
                 end
             end
 
@@ -298,7 +299,10 @@ function p = resolvePackage(packageArg)
         pkgInfo = struct('version', 'unknown', 'name', r.name);
     end
 
-    isLocal = strcmp(r.org, 'local') && strcmp(r.channel, 'local');
+    % "Local" here means any non-gh source type (local, fex, or web). Update
+    % treats them the same way: reinstall from source rather than from a
+    % channel index.
+    isLocal = ~strcmp(r.type, 'gh');
     sourcePath = '';
     editable = false;
     noSource = false;
@@ -313,13 +317,15 @@ function p = resolvePackage(packageArg)
         noSource = isempty(sourcePath);
         if ~noSource && ~isfolder(sourcePath)
             error('mip:update:sourceNotFound', ...
-                  'Source directory "%s" for package "%s" no longer exists.', sourcePath, r.fqn);
+                  'Source directory "%s" for package "%s" no longer exists.', ...
+                  sourcePath, mip.parse.display_fqn(r.fqn));
         end
         editable = isfield(pkgInfo, 'editable') && pkgInfo.editable;
     end
 
     p = struct( ...
         'fqn', r.fqn, ...
+        'type', r.type, ...
         'org', r.org, ...
         'channel', r.channel, ...
         'name', r.name, ...
@@ -337,11 +343,12 @@ function [tf, latestInfo] = checkRemoteNeedsUpdate(p, force)
 % Also returns the latestInfo struct (needed for downloading).
 
     fqn = p.fqn;
+    displayFqn = mip.parse.display_fqn(fqn);
     installedVersion = p.pkgInfo.version;
     channelStr = [p.org '/' p.channel];
 
     fprintf('Checking for updates to "%s" (installed: %s, channel: %s)...\n', ...
-            fqn, installedVersion, channelStr);
+            displayFqn, installedVersion, channelStr);
 
     index = mip.channel.fetch_index(channelStr);
     [packageInfoMap, unavailablePackages] = mip.resolve.build_package_info_map(index, p.org, p.channel);
@@ -363,18 +370,18 @@ function [tf, latestInfo] = checkRemoteNeedsUpdate(p, force)
     latestInfo = packageInfoMap(fqn);
 
     if force
-        fprintf('Force updating "%s" (%s)\n', fqn, installedVersion);
+        fprintf('Force updating "%s" (%s)\n', displayFqn, installedVersion);
         tf = true;
         return
     end
 
     if ~mip.state.check_needs_update(p.pkgInfo, latestInfo)
-        fprintf('Package "%s" is already up to date (%s)\n', fqn, installedVersion);
+        fprintf('Package "%s" is already up to date (%s)\n', displayFqn, installedVersion);
         tf = false;
         return
     end
 
-    fprintf('Updating "%s": %s -> %s\n', fqn, installedVersion, latestInfo.version);
+    fprintf('Updating "%s": %s -> %s\n', displayFqn, installedVersion, latestInfo.version);
     tf = true;
 end
 
@@ -383,7 +390,8 @@ function downloadAndReplace(p)
 % The old package is moved to a backup and restored if the swap fails,
 % so a failure at any point does not destroy the installed copy.
 
-    fprintf('Downloading %s %s...\n', p.fqn, p.latestInfo.version);
+    displayFqn = mip.parse.display_fqn(p.fqn);
+    fprintf('Downloading %s %s...\n', displayFqn, p.latestInfo.version);
 
     tempDir = tempname;
     mkdir(tempDir);
@@ -406,7 +414,7 @@ function downloadAndReplace(p)
             rethrow(ME);
         end
         rmdir(backupDir, 's');
-        fprintf('Successfully updated "%s" to %s\n', p.fqn, p.latestInfo.version);
+        fprintf('Successfully updated "%s" to %s\n', displayFqn, p.latestInfo.version);
     catch ME
         if exist(tempDir, 'dir')
             rmdir(tempDir, 's');
@@ -424,8 +432,7 @@ function installMissingDeps(remoteFqns)
     missingDeps = {};
     for i = 1:length(remoteFqns)
         fqn = remoteFqns{i};
-        r = mip.parse.parse_package_arg(fqn);
-        pkgDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
+        pkgDir = mip.paths.get_package_dir(fqn);
         if ~exist(pkgDir, 'dir')
             continue
         end
@@ -440,8 +447,7 @@ function installMissingDeps(remoteFqns)
         end
         for j = 1:length(deps)
             depFqn = mip.resolve.resolve_dependency(deps{j});
-            depR = mip.parse.parse_package_arg(depFqn);
-            depDir = mip.paths.get_package_dir(depR.org, depR.channel, depR.name);
+            depDir = mip.paths.get_package_dir(depFqn);
             if ~exist(depDir, 'dir')
                 missingDeps{end+1} = deps{j}; %#ok<AGROW>
             end
@@ -488,12 +494,13 @@ function reloadPreviouslyLoaded(loadedBefore, directlyLoadedBefore)
         if ~r.is_fqn
             continue
         end
-        pkgDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
+        pkgDir = mip.paths.get_package_dir(pkg);
+        displayPkg = mip.parse.display_fqn(pkg);
         if ~exist(pkgDir, 'dir')
-            fprintf('Warning: "%s" was loaded before update but is no longer installed; skipping reload.\n', pkg);
+            fprintf('Warning: "%s" was loaded before update but is no longer installed; skipping reload.\n', displayPkg);
             continue
         end
-        fprintf('Reloading "%s"...\n', pkg);
+        fprintf('Reloading "%s"...\n', displayPkg);
         if ismember(pkg, directlyLoadedBefore)
             mip.load(pkg);
         else
@@ -503,7 +510,7 @@ function reloadPreviouslyLoaded(loadedBefore, directlyLoadedBefore)
 end
 
 function updateSelf(p, force)
-% Self-update for mip-org/core/mip. mip cannot be uninstalled through
+% Self-update for gh/mip-org/core/mip. mip cannot be uninstalled through
 % the normal flow, so we download and swap in place.
 
     fqn = p.fqn;

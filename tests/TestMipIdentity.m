@@ -49,11 +49,11 @@ classdef TestMipIdentity < matlab.unittest.TestCase
         function testCanUnloadMipLocalInstall(testCase)
             % A local/editable 'mip' package should be unloadable
             createTestPackage(testCase.TestRoot, 'local', 'local', 'mip');
-            mip.load('local/local/mip');
-            testCase.verifyTrue(mip.state.is_loaded('local/local/mip'));
+            mip.load('local/mip');
+            testCase.verifyTrue(mip.state.is_loaded('local/mip'));
 
-            mip.unload('local/local/mip');
-            testCase.verifyFalse(mip.state.is_loaded('local/local/mip'));
+            mip.unload('local/mip');
+            testCase.verifyFalse(mip.state.is_loaded('local/mip'));
         end
 
         function testMipOrgCoreMipAlwaysLoadedMessage(testCase)
@@ -63,36 +63,36 @@ classdef TestMipIdentity < matlab.unittest.TestCase
         end
 
         function testUnloadAllForce_NeverUnloadsMipOrgCoreMip(testCase)
-            mip.state.key_value_append('MIP_LOADED_PACKAGES', 'mip-org/core/mip');
-            mip.state.key_value_append('MIP_STICKY_PACKAGES', 'mip-org/core/mip');
+            mip.state.key_value_append('MIP_LOADED_PACKAGES', 'gh/mip-org/core/mip');
+            mip.state.key_value_append('MIP_STICKY_PACKAGES', 'gh/mip-org/core/mip');
 
             createTestPackage(testCase.TestRoot, 'mylab', 'custom', 'mip');
             mip.load('mylab/custom/mip');
 
             mip.unload('--all', '--force');
 
-            % mip-org/core/mip should still be loaded
-            testCase.verifyTrue(mip.state.is_loaded('mip-org/core/mip'));
+            % gh/mip-org/core/mip should still be loaded
+            testCase.verifyTrue(mip.state.is_loaded('gh/mip-org/core/mip'));
             % mylab/custom/mip should be unloaded
             testCase.verifyFalse(mip.state.is_loaded('mylab/custom/mip'));
         end
 
         function testMipEntryPoint_SetsFqn(testCase)
             % After calling mip(), MIP_LOADED_PACKAGES should contain
-            % 'mip-org/core/mip' (not a path-derived FQN)
+            % 'gh/mip-org/core/mip' (canonical FQN, not path-derived)
             clearMipState();
             mip('version');
             loaded = mip.state.key_value_get('MIP_LOADED_PACKAGES');
-            testCase.verifyTrue(ismember('mip-org/core/mip', loaded), ...
-                'mip-org/core/mip should be in MIP_LOADED_PACKAGES after calling mip()');
+            testCase.verifyTrue(ismember('gh/mip-org/core/mip', loaded), ...
+                'gh/mip-org/core/mip should be in MIP_LOADED_PACKAGES after calling mip()');
         end
 
         function testMipEntryPoint_SetsSticky(testCase)
             clearMipState();
             mip('version');
             sticky = mip.state.key_value_get('MIP_STICKY_PACKAGES');
-            testCase.verifyTrue(ismember('mip-org/core/mip', sticky), ...
-                'mip-org/core/mip should be in MIP_STICKY_PACKAGES after calling mip()');
+            testCase.verifyTrue(ismember('gh/mip-org/core/mip', sticky), ...
+                'gh/mip-org/core/mip should be in MIP_STICKY_PACKAGES after calling mip()');
         end
 
         function testMipEntryPoint_NoGarbageFqn(testCase)

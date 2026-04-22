@@ -1,16 +1,31 @@
-function install_local(sourceDir, editable, noCompile)
+function install_local(sourceDir, editable, noCompile, sourceType)
 %INSTALL_LOCAL   Install a package from a local directory with mip.yaml.
 %
+% Non-channel packages live under a top-level source-type directory
+% (no org/channel). 'local' is used for directory and editable installs;
+% 'fex' for File Exchange installs; 'web' for generic remote .zip installs.
+%
 % Args:
-%   sourceDir - Path to the directory containing mip.yaml
-%   editable  - If true, create an editable install (no copy)
-%   noCompile - If true, skip compilation (editable installs only)
+%   sourceDir  - Path to the directory containing mip.yaml
+%   editable   - If true, create an editable install (no copy)
+%   noCompile  - If true, skip compilation (editable installs only)
+%   sourceType - Source type ('local', 'fex', or 'web'). Default: 'local'.
 
 if nargin < 2
     editable = false;
 end
 if nargin < 3
     noCompile = false;
+end
+if nargin < 4
+    sourceType = 'local';
+end
+
+validSourceTypes = {'local', 'fex', 'web'};
+if ~ismember(sourceType, validSourceTypes)
+    error('mip:install:invalidSourceType', ...
+          'Invalid sourceType "%s". Must be one of: %s.', ...
+          sourceType, strjoin(validSourceTypes, ', '));
 end
 
 % Resolve to absolute path
@@ -23,18 +38,15 @@ packageName = mipConfig.name;
 fprintf('Found package "%s" (version %s)\n', packageName, ...
         num2str(mipConfig.version));
 
-% Use local/local as the org/channel for local installs
-org = 'local';
-channelName = 'local';
-fqn = mip.parse.make_fqn(org, channelName, packageName);
+fqn = [sourceType '/' packageName];
 
 % Check if already installed. If an equivalent but differently-cased/
 % separator-punctuated name is on disk, reject rather than silently skip:
 % allowing the install would create a parallel directory for the same
 % logical package.
-existingName = mip.resolve.installed_dir(org, channelName, packageName);
+existingName = mip.resolve.installed_dir(fqn);
 if ~isempty(existingName) && ~strcmp(existingName, packageName)
-    existingFqn = mip.parse.make_fqn(org, channelName, existingName);
+    existingFqn = [sourceType '/' existingName];
     error('mip:install:equivalentAlreadyInstalled', ...
           ['Cannot install "%s": an equivalent package "%s" is already installed. ' ...
            'Package names are equivalent when they match after lowercasing and ' ...
@@ -42,7 +54,7 @@ if ~isempty(existingName) && ~strcmp(existingName, packageName)
           fqn, existingFqn, existingFqn);
 end
 
-pkgDir = mip.paths.get_package_dir(org, channelName, packageName);
+pkgDir = mip.paths.get_package_dir(fqn);
 if exist(pkgDir, 'dir')
     fprintf('Package "%s" is already installed. Uninstall first to reinstall.\n', fqn);
     return;
@@ -55,10 +67,10 @@ if ~isempty(mipConfig.dependencies)
         dep = mipConfig.dependencies{i};
         depResult = mip.parse.parse_package_arg(dep);
         if depResult.is_fqn
-            depDir = mip.paths.get_package_dir(depResult.org, depResult.channel, depResult.name);
+            depDir = mip.paths.get_package_dir(depResult.fqn);
         else
             % Bare name dependency: resolve to mip-org/core
-            depDir = mip.paths.get_package_dir('mip-org', 'core', depResult.name);
+            depDir = mip.paths.get_package_dir(mip.parse.make_fqn('mip-org', 'core', depResult.name));
         end
         if ~exist(depDir, 'dir')
             error('mip:dependencyNotFound', ...
@@ -84,7 +96,7 @@ allInstalled = mip.resolve.find_all_installed_by_name(packageName);
 if length(allInstalled) > 1
     fprintf('\nWarning: Package "%s" is installed from multiple channels:\n', packageName);
     for i = 1:length(allInstalled)
-        fprintf('  - %s\n', allInstalled{i});
+        fprintf('  - %s\n', mip.parse.display_fqn(allInstalled{i}));
     end
 end
 

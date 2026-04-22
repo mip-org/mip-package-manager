@@ -5,10 +5,11 @@ function result = resolve_to_installed(packageArg)
 % installed packages, and verifies the package directory exists.
 %
 % Args:
-%   packageArg - Package string: 'name' or 'org/channel/name'
+%   packageArg - Package string: 'name', 'org/channel/name', 'local/name',
+%                'fex/name', or 'gh/org/channel/name'.
 %
 % Returns:
-%   result - Struct with fields: fqn, org, channel, name, pkg_dir
+%   result - Struct with fields: fqn, type, org, channel, name, pkg_dir.
 %            Returns empty [] if the package is not installed.
 
 if isstring(packageArg)
@@ -21,13 +22,18 @@ if parsed.is_fqn
     % Canonicalize: find the actual on-disk name (case-insensitive) so that
     % downstream code (and storage) sees the canonical form regardless of
     % how the user typed the name.
-    onDisk = mip.resolve.installed_dir(parsed.org, parsed.channel, parsed.name);
+    onDisk = mip.resolve.installed_dir(parsed.fqn);
     if isempty(onDisk)
         result = [];
         return
     end
     parsed.name = onDisk;
-    fqn = mip.parse.make_fqn(parsed.org, parsed.channel, onDisk);
+    if strcmp(parsed.type, 'gh')
+        fqn = mip.parse.make_fqn(parsed.org, parsed.channel, onDisk);
+    else
+        fqn = [parsed.type '/' onDisk];
+    end
+    parsed.fqn = fqn;
 else
     fqn = mip.resolve.resolve_bare_name(parsed.name);
     if isempty(fqn)
@@ -37,7 +43,7 @@ else
     parsed = mip.parse.parse_package_arg(fqn);
 end
 
-pkg_dir = mip.paths.get_package_dir(parsed.org, parsed.channel, parsed.name);
+pkg_dir = mip.paths.get_package_dir(parsed.fqn);
 
 if ~exist(pkg_dir, 'dir')
     result = [];
@@ -46,6 +52,7 @@ end
 
 result = struct( ...
     'fqn', fqn, ...
+    'type', parsed.type, ...
     'org', parsed.org, ...
     'channel', parsed.channel, ...
     'name', parsed.name, ...

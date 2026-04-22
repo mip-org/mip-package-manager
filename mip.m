@@ -57,8 +57,8 @@ if nargin < 1
 end
 
 % Ensure mip itself is always tracked as a loaded sticky package
-mip.state.key_value_append('MIP_LOADED_PACKAGES', 'mip-org/core/mip');
-mip.state.key_value_append('MIP_STICKY_PACKAGES', 'mip-org/core/mip');
+mip.state.key_value_append('MIP_LOADED_PACKAGES', 'gh/mip-org/core/mip');
+mip.state.key_value_append('MIP_STICKY_PACKAGES', 'gh/mip-org/core/mip');
 
 % Normalize command to lowercase
 command = lower(command);

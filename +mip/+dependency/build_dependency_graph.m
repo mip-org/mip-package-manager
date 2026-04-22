@@ -60,7 +60,7 @@ for i = 1:length(dependencies)
     dep = dependencies{i};
     depResult = mip.parse.parse_package_arg(dep);
     if depResult.is_fqn
-        depFqn = dep;
+        depFqn = depResult.fqn;
     else
         depFqn = mip.parse.make_fqn('mip-org', 'core', depResult.name);
     end

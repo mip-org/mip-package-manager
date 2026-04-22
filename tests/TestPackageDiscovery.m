@@ -40,58 +40,58 @@ classdef TestPackageDiscovery < matlab.unittest.TestCase
         function testResolveBareName_SingleMatch(testCase)
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'chebfun');
             fqn = mip.resolve.resolve_bare_name('chebfun');
-            testCase.verifyEqual(fqn, 'mip-org/core/chebfun');
+            testCase.verifyEqual(fqn, 'gh/mip-org/core/chebfun');
         end
 
         function testResolveBareName_PrefersCoreChannel(testCase)
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'testpkg');
             createTestPackage(testCase.TestRoot, 'mylab', 'custom', 'testpkg');
             fqn = mip.resolve.resolve_bare_name('testpkg');
-            testCase.verifyEqual(fqn, 'mip-org/core/testpkg');
+            testCase.verifyEqual(fqn, 'gh/mip-org/core/testpkg');
         end
 
         function testResolveBareName_FallsBackToAlphabetical(testCase)
             createTestPackage(testCase.TestRoot, 'alab', 'chan1', 'testpkg');
             createTestPackage(testCase.TestRoot, 'zlab', 'chan2', 'testpkg');
             fqn = mip.resolve.resolve_bare_name('testpkg');
-            testCase.verifyEqual(fqn, 'alab/chan1/testpkg');
+            testCase.verifyEqual(fqn, 'gh/alab/chan1/testpkg');
         end
 
         function testResolveBareName_CustomChannelOnly(testCase)
             createTestPackage(testCase.TestRoot, 'mylab', 'custom', 'mypkg');
             fqn = mip.resolve.resolve_bare_name('mypkg');
-            testCase.verifyEqual(fqn, 'mylab/custom/mypkg');
+            testCase.verifyEqual(fqn, 'gh/mylab/custom/mypkg');
         end
 
         function testResolveBareName_LocalInstall(testCase)
             createTestPackage(testCase.TestRoot, 'local', 'local', 'devpkg');
             fqn = mip.resolve.resolve_bare_name('devpkg');
-            testCase.verifyEqual(fqn, 'local/local/devpkg');
+            testCase.verifyEqual(fqn, 'local/devpkg');
         end
 
         %% resolve_dependency tests
 
         function testResolveDependency_FqnPassthrough(testCase)
-            fqn = mip.resolve.resolve_dependency('mip-org/core/chebfun');
-            testCase.verifyEqual(fqn, 'mip-org/core/chebfun');
+            fqn = mip.resolve.resolve_dependency('gh/mip-org/core/chebfun');
+            testCase.verifyEqual(fqn, 'gh/mip-org/core/chebfun');
         end
 
         function testResolveDependency_BareNameResolvesToCore(testCase)
             fqn = mip.resolve.resolve_dependency('chebfun');
-            testCase.verifyEqual(fqn, 'mip-org/core/chebfun');
+            testCase.verifyEqual(fqn, 'gh/mip-org/core/chebfun');
         end
 
         function testResolveDependency_BareNameIgnoresSameChannel(testCase)
             % Even when a package with the same name exists on a non-core
-            % channel, bare-name deps always resolve to mip-org/core.
+            % channel, bare-name deps always resolve to gh/mip-org/core.
             createTestPackage(testCase.TestRoot, 'mylab', 'custom', 'somepkg');
             fqn = mip.resolve.resolve_dependency('somepkg');
-            testCase.verifyEqual(fqn, 'mip-org/core/somepkg');
+            testCase.verifyEqual(fqn, 'gh/mip-org/core/somepkg');
         end
 
         function testResolveDependency_NonCoreFqnPreserved(testCase)
             fqn = mip.resolve.resolve_dependency('mylab/custom/somepkg');
-            testCase.verifyEqual(fqn, 'mylab/custom/somepkg');
+            testCase.verifyEqual(fqn, 'gh/mylab/custom/somepkg');
         end
 
         %% list_installed_packages tests
@@ -104,7 +104,7 @@ classdef TestPackageDiscovery < matlab.unittest.TestCase
         function testListInstalled_SinglePackage(testCase)
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'chebfun');
             pkgs = mip.state.list_installed_packages();
-            testCase.verifyEqual(pkgs, {'mip-org/core/chebfun'});
+            testCase.verifyEqual(pkgs, {'gh/mip-org/core/chebfun'});
         end
 
         function testListInstalled_MultiplePackages(testCase)
@@ -113,14 +113,14 @@ classdef TestPackageDiscovery < matlab.unittest.TestCase
             createTestPackage(testCase.TestRoot, 'mylab', 'custom', 'gamma');
             pkgs = mip.state.list_installed_packages();
             testCase.verifyEqual(sort(pkgs), ...
-                sort({'mip-org/core/alpha', 'mip-org/core/beta', 'mylab/custom/gamma'}));
+                sort({'gh/mip-org/core/alpha', 'gh/mip-org/core/beta', 'gh/mylab/custom/gamma'}));
         end
 
         function testListInstalled_IsSorted(testCase)
             createTestPackage(testCase.TestRoot, 'zlab', 'chan', 'zpkg');
             createTestPackage(testCase.TestRoot, 'alab', 'chan', 'apkg');
             pkgs = mip.state.list_installed_packages();
-            testCase.verifyEqual(pkgs, {'alab/chan/apkg', 'zlab/chan/zpkg'});
+            testCase.verifyEqual(pkgs, {'gh/alab/chan/apkg', 'gh/zlab/chan/zpkg'});
         end
 
         %% directly_installed tests
@@ -131,23 +131,23 @@ classdef TestPackageDiscovery < matlab.unittest.TestCase
         end
 
         function testDirectlyInstalled_AddAndGet(testCase)
-            mip.state.add_directly_installed('mip-org/core/chebfun');
+            mip.state.add_directly_installed('gh/mip-org/core/chebfun');
             pkgs = mip.state.get_directly_installed();
-            testCase.verifyEqual(pkgs, {'mip-org/core/chebfun'});
+            testCase.verifyEqual(pkgs, {'gh/mip-org/core/chebfun'});
         end
 
         function testDirectlyInstalled_AddDuplicate(testCase)
-            mip.state.add_directly_installed('mip-org/core/chebfun');
-            mip.state.add_directly_installed('mip-org/core/chebfun');
+            mip.state.add_directly_installed('gh/mip-org/core/chebfun');
+            mip.state.add_directly_installed('gh/mip-org/core/chebfun');
             pkgs = mip.state.get_directly_installed();
-            testCase.verifyEqual(pkgs, {'mip-org/core/chebfun'});
+            testCase.verifyEqual(pkgs, {'gh/mip-org/core/chebfun'});
         end
 
         function testDirectlyInstalled_AddMultiple(testCase)
             mip.state.add_directly_installed('mip-org/core/alpha');
             mip.state.add_directly_installed('mip-org/core/beta');
             pkgs = mip.state.get_directly_installed();
-            testCase.verifyEqual(sort(pkgs), sort({'mip-org/core/alpha', 'mip-org/core/beta'}));
+            testCase.verifyEqual(sort(pkgs), sort({'gh/mip-org/core/alpha', 'gh/mip-org/core/beta'}));
         end
 
         function testDirectlyInstalled_Remove(testCase)
@@ -155,14 +155,14 @@ classdef TestPackageDiscovery < matlab.unittest.TestCase
             mip.state.add_directly_installed('mip-org/core/beta');
             mip.state.remove_directly_installed('mip-org/core/alpha');
             pkgs = mip.state.get_directly_installed();
-            testCase.verifyEqual(pkgs, {'mip-org/core/beta'});
+            testCase.verifyEqual(pkgs, {'gh/mip-org/core/beta'});
         end
 
         function testDirectlyInstalled_RemoveNonExistent(testCase)
             mip.state.add_directly_installed('mip-org/core/alpha');
             mip.state.remove_directly_installed('mip-org/core/nonexistent');
             pkgs = mip.state.get_directly_installed();
-            testCase.verifyEqual(pkgs, {'mip-org/core/alpha'});
+            testCase.verifyEqual(pkgs, {'gh/mip-org/core/alpha'});
         end
 
         function testDirectlyInstalled_SetOverwrites(testCase)
@@ -217,38 +217,38 @@ classdef TestPackageDiscovery < matlab.unittest.TestCase
         %% get_package_dir tests
 
         function testGetPackageDir(testCase)
-            pkgDir = mip.paths.get_package_dir('mip-org', 'core', 'chebfun');
-            expected = fullfile(testCase.TestRoot, 'packages', 'mip-org', 'core', 'chebfun');
+            pkgDir = mip.paths.get_package_dir('gh/mip-org/core/chebfun');
+            expected = fullfile(testCase.TestRoot, 'packages', 'gh', 'mip-org', 'core', 'chebfun');
             testCase.verifyEqual(pkgDir, expected);
         end
 
         %% is_loaded / is_sticky / is_directly_loaded tests
 
         function testIsLoaded_False(testCase)
-            testCase.verifyFalse(mip.state.is_loaded('mip-org/core/chebfun'));
+            testCase.verifyFalse(mip.state.is_loaded('gh/mip-org/core/chebfun'));
         end
 
         function testIsLoaded_True(testCase)
-            mip.state.key_value_append('MIP_LOADED_PACKAGES', 'mip-org/core/chebfun');
-            testCase.verifyTrue(mip.state.is_loaded('mip-org/core/chebfun'));
+            mip.state.key_value_append('MIP_LOADED_PACKAGES', 'gh/mip-org/core/chebfun');
+            testCase.verifyTrue(mip.state.is_loaded('gh/mip-org/core/chebfun'));
         end
 
         function testIsSticky_False(testCase)
-            testCase.verifyFalse(mip.state.is_sticky('mip-org/core/chebfun'));
+            testCase.verifyFalse(mip.state.is_sticky('gh/mip-org/core/chebfun'));
         end
 
         function testIsSticky_True(testCase)
-            mip.state.key_value_append('MIP_STICKY_PACKAGES', 'mip-org/core/chebfun');
-            testCase.verifyTrue(mip.state.is_sticky('mip-org/core/chebfun'));
+            mip.state.key_value_append('MIP_STICKY_PACKAGES', 'gh/mip-org/core/chebfun');
+            testCase.verifyTrue(mip.state.is_sticky('gh/mip-org/core/chebfun'));
         end
 
         function testIsDirectlyLoaded_False(testCase)
-            testCase.verifyFalse(mip.state.is_directly_loaded('mip-org/core/chebfun'));
+            testCase.verifyFalse(mip.state.is_directly_loaded('gh/mip-org/core/chebfun'));
         end
 
         function testIsDirectlyLoaded_True(testCase)
-            mip.state.key_value_append('MIP_DIRECTLY_LOADED_PACKAGES', 'mip-org/core/chebfun');
-            testCase.verifyTrue(mip.state.is_directly_loaded('mip-org/core/chebfun'));
+            mip.state.key_value_append('MIP_DIRECTLY_LOADED_PACKAGES', 'gh/mip-org/core/chebfun');
+            testCase.verifyTrue(mip.state.is_directly_loaded('gh/mip-org/core/chebfun'));
         end
 
         %% read_package_json tests

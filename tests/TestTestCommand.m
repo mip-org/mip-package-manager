@@ -37,27 +37,27 @@ classdef TestTestCommand < matlab.unittest.TestCase
         function testTest_NoTestScript(testCase)
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'notestpkg');
             % Create the source subdirectory expected by get_source_dir
-            mkdir(fullfile(testCase.TestRoot, 'packages', 'mip-org', 'core', 'notestpkg', 'notestpkg'));
+            mkdir(fullfile(testCase.TestRoot, 'packages', 'gh', 'mip-org', 'core', 'notestpkg', 'notestpkg'));
             output = evalc('mip.test(''mip-org/core/notestpkg'')');
             testCase.verifyTrue(contains(output, 'No test script'));
         end
 
         function testTest_RunsTestScript(testCase)
             pkgDir = createTestPackageWithTestScript(testCase.TestRoot, ...
-                'mip-org', 'core', 'testpkg', 'run_test.m', false);
+                'mip-org', 'core','testpkg', 'run_test.m', false);
             output = evalc('mip.test(''mip-org/core/testpkg'')');
             testCase.verifyTrue(contains(output, 'Running test script'));
         end
 
         function testTest_FailingScriptErrors(testCase)
             pkgDir = createTestPackageWithTestScript(testCase.TestRoot, ...
-                'mip-org', 'core', 'failpkg', 'run_test.m', true);
+                'mip-org', 'core','failpkg', 'run_test.m', true);
             testCase.verifyError(@() mip.test('mip-org/core/failpkg'), 'mip:test:failed');
         end
 
         function testTest_LoadsPackageIfNotLoaded(testCase)
             pkgDir = createTestPackageWithTestScript(testCase.TestRoot, ...
-                'mip-org', 'core', 'autoloadpkg', 'run_test.m', false);
+                'mip-org', 'core','autoloadpkg', 'run_test.m', false);
             testCase.verifyFalse(mip.state.is_loaded('mip-org/core/autoloadpkg'));
             evalc('mip.test(''mip-org/core/autoloadpkg'')');
             testCase.verifyTrue(mip.state.is_loaded('mip-org/core/autoloadpkg'));
@@ -65,7 +65,7 @@ classdef TestTestCommand < matlab.unittest.TestCase
 
         function testTest_BareNameResolution(testCase)
             pkgDir = createTestPackageWithTestScript(testCase.TestRoot, ...
-                'mip-org', 'core', 'barepkg', 'run_test.m', false);
+                'mip-org', 'core','barepkg', 'run_test.m', false);
             output = evalc('mip.test(''barepkg'')');
             testCase.verifyTrue(contains(output, 'Running test script'));
         end

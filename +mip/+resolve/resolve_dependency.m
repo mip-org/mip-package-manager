@@ -17,7 +17,7 @@ function depFqn = resolve_dependency(depName)
 result = mip.parse.parse_package_arg(depName);
 
 if result.is_fqn
-    depFqn = depName;
+    depFqn = result.fqn;
     return
 end
 

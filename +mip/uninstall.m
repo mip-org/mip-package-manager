@@ -30,14 +30,15 @@ function uninstall(varargin)
             % Canonicalize to the on-disk name so the stored FQN we
             % remove from directly_installed.txt matches what was added
             % during install.
-            onDisk = mip.resolve.installed_dir(result.org, result.channel, result.name);
+            onDisk = mip.resolve.installed_dir(result.fqn);
             if isempty(onDisk)
-                fqn = arg;
-                pkgDir = mip.paths.get_package_dir(result.org, result.channel, result.name);
-            else
+                fqn = result.fqn;
+            elseif strcmp(result.type, 'gh')
                 fqn = mip.parse.make_fqn(result.org, result.channel, onDisk);
-                pkgDir = mip.paths.get_package_dir(result.org, result.channel, onDisk);
+            else
+                fqn = [result.type '/' onDisk];
             end
+            pkgDir = mip.paths.get_package_dir(fqn);
         else
             allMatches = mip.resolve.find_all_installed_by_name(result.name);
             if isempty(allMatches)
@@ -46,14 +47,13 @@ function uninstall(varargin)
             elseif length(allMatches) > 1
                 fprintf('Package name "%s" is ambiguous. It is installed in multiple channels:\n', result.name);
                 for k = 1:length(allMatches)
-                    fprintf('  %s\n', allMatches{k});
+                    fprintf('  %s\n', mip.parse.display_fqn(allMatches{k}));
                 end
                 fprintf('Please specify the fully qualified name to uninstall.\n');
                 continue
             end
             fqn = allMatches{1};
-            r = mip.parse.parse_package_arg(fqn);
-            pkgDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
+            pkgDir = mip.paths.get_package_dir(fqn);
         end
 
         if ~exist(pkgDir, 'dir')
@@ -63,12 +63,12 @@ function uninstall(varargin)
         end
     end
 
-    % Self-uninstall: mip-org/core/mip triggers full mip removal
-    if ismember('mip-org/core/mip', resolvedPackages)
+    % Self-uninstall: gh/mip-org/core/mip triggers full mip removal
+    if ismember('gh/mip-org/core/mip', resolvedPackages)
         if uninstallSelf()
             return
         end
-        resolvedPackages = resolvedPackages(~strcmp(resolvedPackages, 'mip-org/core/mip'));
+        resolvedPackages = resolvedPackages(~strcmp(resolvedPackages, 'gh/mip-org/core/mip'));
     end
 
     % Report packages that aren't installed
@@ -91,25 +91,23 @@ function uninstall(varargin)
     % Uninstall each requested package
     for i = 1:length(resolvedPackages)
         fqn = resolvedPackages{i};
-        r = mip.parse.parse_package_arg(fqn);
-        pkgDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
+        pkgDir = mip.paths.get_package_dir(fqn);
 
         try
-            fprintf('Uninstalling "%s"...\n', fqn);
+            fprintf('Uninstalling "%s"...\n', mip.parse.display_fqn(fqn));
             rmdir(pkgDir, 's');
-            fprintf('Uninstalled package "%s"\n', fqn);
+            fprintf('Uninstalled package "%s"\n', mip.parse.display_fqn(fqn));
         catch ME
             error('mip:uninstallFailed', ...
-                  'Failed to uninstall package "%s": %s', fqn, ME.message);
+                  'Failed to uninstall package "%s": %s', mip.parse.display_fqn(fqn), ME.message);
         end
 
         % Remove from directly installed and pinned packages
         mip.state.remove_directly_installed(fqn);
         mip.state.remove_pinned(fqn);
 
-        % Clean up empty parent directories
-        mip.paths.cleanup_empty_dirs(fullfile(mip.paths.get_packages_dir(), r.org, r.channel));
-        mip.paths.cleanup_empty_dirs(fullfile(mip.paths.get_packages_dir(), r.org));
+        % Clean up empty parent directories (derived from the FQN layout)
+        cleanupPackageParents(fqn);
     end
 
     % Prune packages that are no longer needed
@@ -119,12 +117,27 @@ function uninstall(varargin)
     mip.state.check_broken_dependencies('installed');
 end
 
+function cleanupPackageParents(fqn)
+% Remove empty parent directories above the uninstalled package. For a
+% gh FQN this walks up through <channel>, <org>, and the 'gh' root; for
+% a non-gh FQN it only needs to check the source-type directory.
+    packagesDir = mip.paths.get_packages_dir();
+    r = mip.parse.parse_package_arg(fqn);
+    if strcmp(r.type, 'gh')
+        mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'gh', r.org, r.channel));
+        mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'gh', r.org));
+        mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'gh'));
+    else
+        mip.paths.cleanup_empty_dirs(fullfile(packagesDir, r.type));
+    end
+end
+
 function didUninstall = uninstallSelf()
 % Completely uninstall mip: reset state, remove from path, delete root dir.
 
     mipRoot        = mip.root();
     mipPackagesDir = mip.paths.get_packages_dir();
-    mipPackageDir  = mip.paths.get_package_dir('mip-org', 'core', 'mip');
+    mipPackageDir  = mip.paths.get_package_dir('gh/mip-org/core/mip');
     mipSourceDir   = fullfile(mipPackageDir, 'mip');
 
     if ~exist(mipPackagesDir, 'dir')
@@ -162,7 +175,7 @@ function didUninstall = uninstallSelf()
         % Change the path to match what it would be if MATLAB had just started up
         path(pathdef);
 
-        % Remove <MIP_ROOT>/packages/mip-org/core/mip/mip from the path and save it
+        % Remove <MIP_ROOT>/packages/gh/mip-org/core/mip/mip from the path and save it
         % for future MATLAB sessions
         rmpath_safe(mipSourceDir);
         savepath();
@@ -173,7 +186,7 @@ function didUninstall = uninstallSelf()
     end
 
     % Restore the path to what it was before and remove
-    % <MIP_ROOT>/packages/mip-org/core/mip/mip from the path for the current
+    % <MIP_ROOT>/packages/gh/mip-org/core/mip/mip from the path for the current
     % MATLAB session
     path(current_path);
     rmpath_safe(mipSourceDir);

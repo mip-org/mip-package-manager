@@ -31,7 +31,7 @@ compileScript = mip.config.get_build_field(pkgInfo, r.pkg_dir, 'compile_script')
 
 if isempty(compileScript)
     error('mip:compile:noCompileScript', ...
-          'Package "%s" does not have a compile script defined.', r.fqn);
+          'Package "%s" does not have a compile script defined.', mip.parse.display_fqn(r.fqn));
 end
 
 % Determine compile directory
@@ -42,7 +42,7 @@ if ~isfolder(compileDir)
           'Compile directory "%s" does not exist.', compileDir);
 end
 
-fprintf('Compiling "%s"...\n', r.fqn);
+fprintf('Compiling "%s"...\n', mip.parse.display_fqn(r.fqn));
 mip.build.run_compile(compileDir, compileScript);
 
 end
