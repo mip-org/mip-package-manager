@@ -139,7 +139,7 @@ builds:
 
 **`mip.json`** -- generated at install time, lives in the installed package directory. Contains resolved metadata (name, version, architecture, dependencies, paths).
 
-**`.mhl`** -- a ZIP archive containing `load_package.m`, `unload_package.m`, `mip.json`, and the package source.
+**`.mhl`** -- a ZIP archive containing `mip.json` and the package source.
 
 ---
 
@@ -152,8 +152,6 @@ builds:
     mip-org/
       core/
         chebfun/
-          load_package.m
-          unload_package.m
           mip.json
           chebfun/                # source files
     local/

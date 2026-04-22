@@ -436,7 +436,7 @@ Validation happens *before* extraction so that a malicious entry can never write
    - If `--sticky` is specified, add to sticky packages.
    - Return early.
 6. Read `mip.json` and load dependencies first (recursively, as non-direct loads).
-7. Execute `load_package.m` in the package directory (changes `pwd` temporarily). If it errors, raise `mip:loadError` and stop -- the package is **not** marked as loaded (see [§4.8](#48-load_packagem-execution)).
+7. Add each entry in the `mip.json` `paths` field to the MATLAB path (see [§4.8](#48-path-addition-from-mipjson)). If the field is missing, raise `mip:loadNotFound` and stop -- the package is **not** marked as loaded.
 8. Add to `MIP_LOADED_PACKAGES`.
 9. If this is a direct load, add to `MIP_DIRECTLY_LOADED_PACKAGES`.
 10. If `--sticky`, add to `MIP_STICKY_PACKAGES`.
@@ -476,7 +476,7 @@ A loading stack tracks the current dependency chain. If a package appears in its
 
 ### 4.7 The `--addpath` and `--rmpath` Flags
 
-`mip load <pkg> --addpath <relpath>` adds `fullfile(srcDir, relpath)` to the MATLAB path **after** `load_package.m` has run. `--rmpath <relpath>` removes the same. **Both flags may be repeated** to specify multiple paths in one call (e.g. `mip load foo --addpath src/a --addpath src/b --rmpath src/legacy`); each occurrence is accumulated and applied in argument order.
+`mip load <pkg> --addpath <relpath>` adds `fullfile(srcDir, relpath)` to the MATLAB path **after** the entries from `mip.json` `paths` have been added. `--rmpath <relpath>` removes the same. **Both flags may be repeated** to specify multiple paths in one call (e.g. `mip load foo --addpath src/a --addpath src/b --rmpath src/legacy`); each occurrence is accumulated and applied in argument order.
 
 The `srcDir` resolution is the same one used elsewhere ([`mip.paths.get_source_dir`](../+mip/+paths/get_source_dir.m)):
 - **Editable installs**: `srcDir = source_path` (the user's original source directory).
@@ -493,15 +493,13 @@ Constraints:
 
 These adjustments are not separately tracked because the unload sweep (§5.8) removes everything under `srcDir` regardless.
 
-### 4.8 `load_package.m` Execution
+### 4.8 Path Addition from `mip.json`
 
-The load script is executed by `cd`-ing to the package directory and calling `run(loadFile)`. For:
-- **Non-editable installs**: paths are relative, computed from the package directory.
-- **Editable installs**: paths are absolute, pointing to the source directory.
+Each entry in the `mip.json` `paths` field is resolved relative to `srcDir` (see [`mip.paths.get_source_dir`](../+mip/+paths/get_source_dir.m)) and passed to `addpath`. The entry `.` means `srcDir` itself; other entries are resolved via `fullfile(srcDir, entry)`. For:
+- **Non-editable installs**: `srcDir = pkgDir/<name>/`, so paths resolve under the installed copy.
+- **Editable installs**: `srcDir = source_path`, so paths resolve under the user's original source directory.
 
-If `load_package.m` doesn't exist, raises `mip:loadNotFound`.
-
-If `load_package.m` throws during execution, the working directory is restored and `mip:loadError` is raised (with the original error attached as a cause). The package is **not** added to `MIP_LOADED_PACKAGES` or `MIP_DIRECTLY_LOADED_PACKAGES`, so the user can fix the issue and retry without first having to run `mip unload`. The error propagates up through dependency recursion, so a parent package whose dependency failed to load is also not marked as loaded. mip does **not** attempt to undo whatever the partially-executed `load_package.m` did to the path -- recovering arbitrary path or workspace mutations is not generally possible. Users should treat a `mip:loadError` as a signal that the path may be in a partial state and restart MATLAB if anything looks wrong.
+If `mip.json` has no `paths` field, raises `mip:loadNotFound` and the package is **not** added to `MIP_LOADED_PACKAGES` or `MIP_DIRECTLY_LOADED_PACKAGES`.
 
 ---
 
@@ -512,7 +510,7 @@ If `load_package.m` throws during execution, the working directory is restored a
 1. Resolve the package argument to an FQN (see section 2.4.2 for bare name resolution among loaded packages).
 2. If the FQN is `mip-org/core/mip`, raise `mip:cannotUnloadMip`.
 3. If not loaded, print a message and continue (no error).
-4. Execute `unload_package.m` if it exists.
+4. Remove the `mip.json` `paths` entries from the MATLAB path (see [§5.8](#58-path-removal-from-mipjson)).
 5. Remove from `MIP_STICKY_PACKAGES`.
 6. Remove from `MIP_DIRECTLY_LOADED_PACKAGES`.
 7. Remove from `MIP_LOADED_PACKAGES`.
@@ -527,14 +525,14 @@ When multiple loaded packages share the same bare name:
 ### 5.3 Unload All (`mip unload --all`)
 
 1. Find all loaded packages that are **not** in `MIP_STICKY_PACKAGES`.
-2. Execute `unload_package.m` for each.
+2. Remove the `mip.json` `paths` entries for each.
 3. Update state: `MIP_LOADED_PACKAGES` is set to just the sticky packages.
 4. `MIP_DIRECTLY_LOADED_PACKAGES` is filtered to only those that are also sticky.
 
 ### 5.4 Unload All Force (`mip unload --all --force`)
 
 1. Find all loaded packages **except** `mip-org/core/mip`.
-2. Execute `unload_package.m` for each.
+2. Remove the `mip.json` `paths` entries for each.
 3. Reset state:
    - `MIP_LOADED_PACKAGES` = `{'mip-org/core/mip'}`
    - `MIP_DIRECTLY_LOADED_PACKAGES` = `{}`
@@ -546,7 +544,7 @@ After unloading one or more packages, the system prunes dependencies that are no
 
 1. Build the set of "needed" packages: all directly loaded packages plus their transitive dependencies.
 2. For each loaded package not in the needed set (and not `mip-org/core/mip`):
-   - Execute `unload_package.m`.
+   - Remove the `mip.json` `paths` entries.
    - Remove from `MIP_LOADED_PACKAGES`.
 3. After pruning, check for broken dependencies (warn if any loaded package's dependency is no longer loaded).
 
@@ -560,20 +558,13 @@ If two directly-loaded packages share a dependency:
 
 `mip unload pkg1 pkg2` unloads all listed packages, then runs a single prune pass. If one of the listed packages is not loaded, it prints a message but continues with the others.
 
-### 5.8 `unload_package.m` Execution
+### 5.8 Path Removal from `mip.json`
 
-Unload proceeds in two stages:
+Each entry in the `mip.json` `paths` field is resolved against `srcDir` (see [§4.8](#48-path-addition-from-mipjson)) and passed to `rmpath`. MATLAB's `MATLAB:rmpath:DirNotFound` warning is suppressed during this pass so stale or missing entries do not produce noise.
 
-1. **Declarative unload via `mip.json` `paths`**: if `mip.json` contains a `paths` field (the modern layout — see [§3.2.1](#321-non-editable-copy-install), [§3.2.2](#322-editable-install--e----editable)), each entry is `rmpath`'d against `srcDir`. MATLAB's `MATLAB:rmpath:DirNotFound` warning is suppressed during this pass.
-2. **Legacy `unload_package.m`**: if the file exists, it is executed by `cd`-ing to the package directory and calling `run(unloadFile)`.
+If `mip.json` has no `paths` field, the `mip:unloadNotFound` warning is issued. The package is still removed from tracking either way.
 
-The `mip:unloadNotFound` warning is issued **only when both** the `paths` field and `unload_package.m` are absent — i.e. the package has no authoritative list of path entries to remove. Packages that ship either one (or both) unload cleanly without the warning. Either way, the package is still removed from tracking.
-
-**Defensive path sweep**: after the stages above (regardless of outcome), mip walks the current MATLAB path and `rmpath`s every entry that equals `srcDir` or starts with `srcDir<filesep>`. The `srcDir` is resolved via [`mip.paths.get_source_dir`](../+mip/+paths/get_source_dir.m) — the same base used for `mip load --addpath`/`--rmpath`. The sweep handles three cases:
-
-- Paths added via `mip load --addpath` (which neither the `paths` field nor `unload_package.m` knows about).
-- Paths added by `load_package.m` that the matching `unload_package.m` failed to remove (e.g. user-edited scripts that drift out of sync).
-- Packages with no `paths` field and no `unload_package.m` at all — the `mip:unloadNotFound` warning fires, but the path is at least swept clean.
+**Defensive path sweep**: after the step above, mip walks the current MATLAB path and `rmpath`s every entry that equals `srcDir` or starts with `srcDir<filesep>`. The `srcDir` is resolved via [`mip.paths.get_source_dir`](../+mip/+paths/get_source_dir.m) — the same base used for `mip load --addpath`/`--rmpath`. The sweep is what catches paths added via `mip load --addpath` that are not listed in the `paths` field.
 
 Each swept entry is reported (`swept residual path entry for "<fqn>": <path>`). Because the sweep matches only entries beginning with `srcDir<filesep>` (or exactly equal to `srcDir`), a sibling directory whose name happens to share a prefix is never touched.
 
@@ -700,7 +691,7 @@ Special flow for `mip-org/core/mip`:
 1. Fetch the latest from the `mip-org/core` channel.
 2. Download the new `.mhl`, extract to staging.
 3. Replace the installed package in-place.
-4. Reload: `addpath` each entry from the new `mip.json` `paths` field (resolved against the new package dir), then `run` `load_package.m` if present.
+4. Reload: `addpath` each entry from the new `mip.json` `paths` field (resolved against the new package dir).
 
 Does not go through the normal uninstall-and-reinstall update flow, since mip is running and cannot remove itself mid-update. Self-update runs before the batch so it is safe to pass `mip` in the same call as other packages. (This is distinct from `mip uninstall mip`, which is a user-initiated tear-down — see [§6.4](#64-self-uninstall-mip-uninstall-mip).)
 
@@ -927,13 +918,9 @@ Pinned packages are stored in `<root>/packages/pinned.txt`, one FQN per line. Th
     mip-org/
       core/
         mip/                               # The package manager itself
-          load_package.m
-          unload_package.m
           mip.json
           mip/                             # Package source files
         chebfun/
-          load_package.m
-          unload_package.m
           mip.json
           chebfun/
       test-channel1/
@@ -946,12 +933,8 @@ Pinned packages are stored in `<root>/packages/pinned.txt`, one FQN per line. Th
     local/
       local/
         devpkg/                            # Editable install (thin wrapper)
-          load_package.m                   # Contains absolute paths to source
-          unload_package.m
           mip.json                         # editable: true, source_path: /path/to/source
         copypkg/                           # Non-editable local install
-          load_package.m                   # Contains relative paths
-          unload_package.m
           mip.json                         # source_path: /original/source (for updates)
           copypkg/                         # Copied source files
 ```
@@ -979,7 +962,7 @@ Pinned packages are stored in `<root>/packages/pinned.txt`, one FQN per line. Th
 
 Required: `name`. All other fields have defaults or are optional.
 
-The `paths` field is the authoritative list of directories that `mip load` adds to the MATLAB path. Each entry is interpreted relative to `srcDir` (see [`mip.paths.get_source_dir`](../+mip/+paths/get_source_dir.m)): the installed package's source subdir for copy installs, or `source_path` for editable installs. Entries are `rmpath`'d in matching fashion by `mip unload` (see [§5.8](#58-unload_packagem-execution)). Legacy `load_package.m` / `unload_package.m` scripts, if present, are still honored for back-compat but are not generated by modern installs.
+The `paths` field is the authoritative list of directories that `mip load` adds to the MATLAB path. Each entry is interpreted relative to `srcDir` (see [`mip.paths.get_source_dir`](../+mip/+paths/get_source_dir.m)): the installed package's source subdir for copy installs, or `source_path` for editable installs. Entries are `rmpath`'d in matching fashion by `mip unload` (see [§5.8](#58-path-removal-from-mipjson)).
 
 ### 11.2 `mip.yaml` Schema
 
@@ -1008,8 +991,6 @@ mip.json
 <package_name>/
   [source files]
 ```
-
-Legacy `.mhl` archives may additionally contain `load_package.m` and/or `unload_package.m` at the top level; these are still honored for back-compat (see [§4.8](#48-load_packagem-execution) and [§5.8](#58-unload_packagem-execution)) but are not produced by `mip bundle`.
 
 ### 11.4 Empty Directory Cleanup
 
@@ -1073,8 +1054,7 @@ Channel index downloads are cached on disk under `<root>/cache/index/<org>/<chan
 | `mip:circularDependency` | Circular dependency detected |
 | `mip:dependencyNotFound` | A dependency is not installed |
 | `mip:cannotUnloadMip` | Attempt to unload `mip-org/core/mip` |
-| `mip:loadNotFound` | `load_package.m` missing |
-| `mip:loadError` | `load_package.m` threw an error during execution |
+| `mip:loadNotFound` | `mip.json` has no `paths` field |
 | `mip:load:missingChannel` | `--channel` flag without a value in `mip load` |
 | `mip:load:missingAddpathValue` | `--addpath` flag without a value |
 | `mip:load:missingRmpathValue` | `--rmpath` flag without a value |
@@ -1163,7 +1143,7 @@ The following **warning** identifiers are also issued:
 
 | Warning ID | Trigger |
 |---|---|
-| `mip:unloadNotFound` | `mip unload <pkg>` on a package whose `mip.json` has no `paths` field **and** has no `unload_package.m` (see [§5.8](#58-unload_packagem-execution)) |
+| `mip:unloadNotFound` | `mip unload <pkg>` on a package whose `mip.json` has no `paths` field (see [§5.8](#58-path-removal-from-mipjson)) |
 | `mip:brokenDependencies` | After an unload/uninstall, at least one still-loaded or still-installed package has a dependency that is no longer loaded/installed |
 
 ---

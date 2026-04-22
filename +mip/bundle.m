@@ -11,8 +11,6 @@ function bundle(varargin)
 %   --arch <arch>    Override architecture (default: auto-detect via mip.arch())
 %
 % The .mhl file is a ZIP archive containing:
-%   load_package.m
-%   unload_package.m
 %   mip.json
 %   <package_name>/
 %     [all package source files]

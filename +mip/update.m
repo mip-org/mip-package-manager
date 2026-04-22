@@ -606,30 +606,20 @@ function updateSelf(p, force)
             newPathsToAdd = resolvePathList(newSrcDir, newPkgInfo.paths);
         end
 
-        % Unload the currently installed mip. Prefer the legacy
-        % unload_package.m when present; otherwise rmpath the entries
+        % Unload the currently installed mip by rmpath'ing the entries
         % declared in the old mip.json "paths" field.
-        unloadScript = fullfile(pkgDir, 'unload_package.m');
-        if exist(unloadScript, 'file')
-            run(unloadScript);
-        else
-            oldWarn = warning('off', 'MATLAB:rmpath:DirNotFound');
-            for k = 1:length(oldPathsToRemove)
-                rmpath(oldPathsToRemove{k});
-            end
-            warning(oldWarn);
+        oldWarn = warning('off', 'MATLAB:rmpath:DirNotFound');
+        for k = 1:length(oldPathsToRemove)
+            rmpath(oldPathsToRemove{k});
         end
+        warning(oldWarn);
         rmdir(pkgDir, 's');
         movefile(stagingDir, pkgDir);
 
-        % Reload mip: addpath new entries (these now point into the
-        % just-moved pkgDir), then run legacy load_package.m if present.
+        % Reload mip by addpath'ing the new entries (these now point into
+        % the just-moved pkgDir).
         for k = 1:length(newPathsToAdd)
             addpath(newPathsToAdd{k});
-        end
-        loadScript = fullfile(pkgDir, 'load_package.m');
-        if exist(loadScript, 'file')
-            run(loadScript);
         end
         fprintf('Successfully updated mip to %s\n', latestInfo.version);
     catch ME

@@ -59,8 +59,7 @@ classdef TestInstallLocal < matlab.unittest.TestCase
         end
 
         function testEditableInstall_RecordsPathsInMipJson(testCase)
-            % New-style installs carry the paths list inside mip.json and
-            % no longer emit load_package.m / unload_package.m scripts.
+            % Installs carry the paths list inside mip.json.
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install('-e', srcDir);
 
@@ -68,10 +67,6 @@ classdef TestInstallLocal < matlab.unittest.TestCase
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyTrue(isfield(info, 'paths'), ...
                 'Editable install should record "paths" in mip.json');
-            testCase.verifyFalse(exist(fullfile(pkgDir, 'load_package.m'), 'file') > 0, ...
-                'Editable install should no longer generate load_package.m');
-            testCase.verifyFalse(exist(fullfile(pkgDir, 'unload_package.m'), 'file') > 0, ...
-                'Editable install should no longer generate unload_package.m');
         end
 
         function testEditableInstall_MarkedAsDirectlyInstalled(testCase)
@@ -84,8 +79,8 @@ classdef TestInstallLocal < matlab.unittest.TestCase
 
         function testEditableInstall_LoadResolvesToSourceDir(testCase)
             % Editable installs resolve "paths" against source_path (the
-            % original source dir), giving the same effect the old
-            % absolute-path load_package.m provided.
+            % original source dir), so mip.load adds that directory to the
+            % MATLAB path.
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.install('-e', srcDir);
 

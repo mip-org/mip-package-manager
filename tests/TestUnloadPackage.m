@@ -41,11 +41,12 @@ classdef TestUnloadPackage < matlab.unittest.TestCase
 
         function testUnloadPackage_RemovesFromPath(testCase)
             pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'testpkg');
+            srcDir = fullfile(pkgDir, 'testpkg');
             mip.load('mip-org/core/testpkg');
-            testCase.verifyTrue(ismember(pkgDir, strsplit(path, pathsep)));
+            testCase.verifyTrue(ismember(srcDir, strsplit(path, pathsep)));
 
             mip.unload('mip-org/core/testpkg');
-            testCase.verifyFalse(ismember(pkgDir, strsplit(path, pathsep)));
+            testCase.verifyFalse(ismember(srcDir, strsplit(path, pathsep)));
         end
 
         function testUnloadPackage_RemovesFromAllLists(testCase)

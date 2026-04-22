@@ -123,7 +123,8 @@ classdef TestLoadPackage < matlab.unittest.TestCase
         function testLoadPackage_AddsToPath(testCase)
             pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'testpkg');
             mip.load('mip-org/core/testpkg');
-            testCase.verifyTrue(ismember(pkgDir, strsplit(path, pathsep)));
+            srcDir = fullfile(pkgDir, 'testpkg');
+            testCase.verifyTrue(ismember(srcDir, strsplit(path, pathsep)));
         end
 
         function testLoadPackage_MultipleDependencies(testCase)
@@ -169,17 +170,17 @@ classdef TestLoadPackage < matlab.unittest.TestCase
             testCase.verifyTrue(mip.state.is_loaded('mip-org/core/pkgB'));
         end
 
-        function testLoadPackage_LoadScriptError_Throws(testCase)
-            % If load_package.m errors, mip.load should throw mip:loadError.
+        function testLoadPackage_MissingPathsField_Errors(testCase)
+            % A package whose mip.json has no "paths" field cannot be loaded.
             pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'badpkg');
-            writeFailingLoadScript(fullfile(pkgDir, 'load_package.m'));
-            testCase.verifyError(@() mip.load('mip-org/core/badpkg'), 'mip:loadError');
+            removePathsField(fullfile(pkgDir, 'mip.json'));
+            testCase.verifyError(@() mip.load('mip-org/core/badpkg'), 'mip:loadNotFound');
         end
 
-        function testLoadPackage_LoadScriptError_NotMarkedLoaded(testCase)
+        function testLoadPackage_MissingPathsField_NotMarkedLoaded(testCase)
             % After a failed load, the package must not be marked as loaded.
             pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'badpkg');
-            writeFailingLoadScript(fullfile(pkgDir, 'load_package.m'));
+            removePathsField(fullfile(pkgDir, 'mip.json'));
             try
                 mip.load('mip-org/core/badpkg');
             catch
@@ -189,59 +190,17 @@ classdef TestLoadPackage < matlab.unittest.TestCase
             testCase.verifyFalse(mip.state.is_directly_loaded('mip-org/core/badpkg'));
         end
 
-        function testLoadPackage_LoadScriptError_CanRetry(testCase)
-            % After a failed load, fixing the script and reloading should work.
-            pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'badpkg');
-            loadScript = fullfile(pkgDir, 'load_package.m');
-            writeFailingLoadScript(loadScript);
-            try
-                mip.load('mip-org/core/badpkg');
-            catch
-                % expected
-            end
-            % Replace with a working load_package.m and retry
-            fid = fopen(loadScript, 'w');
-            fprintf(fid, 'function load_package()\n');
-            fprintf(fid, '    pkg_dir = fileparts(mfilename(''fullpath''));\n');
-            fprintf(fid, '    addpath(pkg_dir);\n');
-            fprintf(fid, 'end\n');
-            fclose(fid);
-            mip.load('mip-org/core/badpkg');
-            testCase.verifyTrue(mip.state.is_loaded('mip-org/core/badpkg'));
-        end
-
-        function testLoadPackage_LoadScriptError_RestoresWorkingDir(testCase)
-            % A failing load_package.m must not leave pwd inside the package dir.
-            pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'badpkg');
-            writeFailingLoadScript(fullfile(pkgDir, 'load_package.m'));
-            origDir = pwd;
-            try
-                mip.load('mip-org/core/badpkg');
-            catch
-                % expected
-            end
-            testCase.verifyEqual(pwd, origDir);
-        end
-
-        function testLoadPackage_DependencyLoadError_ParentNotLoaded(testCase)
-            % If a dependency fails to load, the parent must also not be marked loaded.
-            depDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'baddep');
-            writeFailingLoadScript(fullfile(depDir, 'load_package.m'));
-            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'mainpkg', ...
-                'dependencies', {'baddep'});
-            testCase.verifyError(@() mip.load('mip-org/core/mainpkg'), 'mip:loadError');
-            testCase.verifyFalse(mip.state.is_loaded('mip-org/core/mainpkg'));
-            testCase.verifyFalse(mip.state.is_loaded('mip-org/core/baddep'));
-        end
-
     end
 end
 
-function writeFailingLoadScript(scriptPath)
-%WRITEFAILINGLOADSCRIPT   Overwrite a load_package.m so that it errors.
-    fid = fopen(scriptPath, 'w');
-    fprintf(fid, 'function load_package()\n');
-    fprintf(fid, '    error(''test:loadFailed'', ''intentional load failure'');\n');
-    fprintf(fid, 'end\n');
+function removePathsField(mipJsonPath)
+%REMOVEPATHSFIELD   Rewrite mip.json with the "paths" field stripped.
+    text = fileread(mipJsonPath);
+    data = jsondecode(text);
+    if isfield(data, 'paths')
+        data = rmfield(data, 'paths');
+    end
+    fid = fopen(mipJsonPath, 'w');
+    fwrite(fid, jsonencode(data));
     fclose(fid);
 end

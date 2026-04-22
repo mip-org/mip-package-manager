@@ -61,11 +61,11 @@ classdef TestUpdateSelf < matlab.unittest.TestCase
             % there surfaces here as a test error.
             mip.update('--force', 'mip-org/core/mip');
 
-            % Remove any MATLAB path entries the downloaded mip's
-            % load_package.m just added, so the verify calls below run
-            % against the repo's mip.* functions, not the test-root
-            % payload (they should be equivalent, but keeping the path
-            % clean avoids surprises if they ever diverge).
+            % Remove any MATLAB path entries the downloaded mip just added,
+            % so the verify calls below run against the repo's mip.*
+            % functions, not the test-root payload (they should be
+            % equivalent, but keeping the path clean avoids surprises if
+            % they ever diverge).
             cleanupTestPaths(testCase.TestRoot);
 
             % Verify the swap succeeded: directory still present, version
@@ -78,14 +78,8 @@ classdef TestUpdateSelf < matlab.unittest.TestCase
                 'version should be replaced with real mip version from channel');
             testCase.verifyEqual(info2.name, 'mip', ...
                 'mip.json name should be "mip"');
-            % The downloaded payload is driven by whatever the published
-            % mhl contains -- either a legacy load_package.m or, once the
-            % channel is republished under the new scheme, a "paths" field
-            % in mip.json. Accept either.
-            hasLoadScript = exist(fullfile(pkgDir, 'load_package.m'), 'file') > 0;
-            hasPathsField = isfield(info2, 'paths');
-            testCase.verifyTrue(hasLoadScript || hasPathsField, ...
-                'downloaded mip payload should expose load_package.m or mip.json "paths"');
+            testCase.verifyTrue(isfield(info2, 'paths'), ...
+                'downloaded mip payload should expose mip.json "paths"');
         end
 
     end

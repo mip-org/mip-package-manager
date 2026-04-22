@@ -62,7 +62,7 @@ function unload(varargin)
             packageDir = '';
         end
 
-        % Execute unload_package.m if it exists
+        % Remove paths declared in mip.json
         executeUnload(packageDir, fqn);
 
         % Remove from all load-state lists
@@ -132,31 +132,9 @@ end
 
 function executeUnload(packageDir, fqn)
     displayFqn = mip.parse.display_fqn(fqn);
-    unloadFile = '';
-    hasUnloadScript = false;
-    if ~isempty(packageDir)
-        unloadFile = fullfile(packageDir, 'unload_package.m');
-        hasUnloadScript = exist(unloadFile, 'file') ~= 0;
-    end
 
-    % Legacy unload_package.m runs first so it sees the paths it expects
-    % to remove before we strip the mip.json "paths" entries.
-    if hasUnloadScript
-        originalDir = pwd;
-        cd(packageDir);
-        try
-            run(unloadFile);
-        catch ME
-            warning('mip:unloadError', ...
-                    'Error executing unload_package.m for package "%s": %s', ...
-                    displayFqn, ME.message);
-        end
-        cd(originalDir);
-    end
-
-    % Remove paths declared in mip.json (new-style packages). Missing
-    % packageDir or unreadable mip.json are non-fatal -- the sweep below
-    % is the backstop.
+    % Remove paths declared in mip.json. Missing packageDir or unreadable
+    % mip.json are non-fatal -- the sweep below is the backstop.
     pkgInfo = [];
     if ~isempty(packageDir) && isfolder(packageDir)
         try
@@ -180,21 +158,15 @@ function executeUnload(packageDir, fqn)
             rmpath(target);
         end
         clear restoreWarn;
-    end
-
-    % Warn only when legacy scripts are missing AND the package predates
-    % the mip.json "paths" field -- i.e. we have no authoritative path
-    % list at all and must rely purely on the defensive sweep.
-    if ~hasUnloadScript && ~hasPathsField
+    else
         warning('mip:unloadNotFound', ...
-                'Package "%s" does not have a unload_package.m file. Path changes may persist.', ...
+                'Package "%s" has no "paths" field in mip.json. Path changes may persist.', ...
                 displayFqn);
     end
 
     % Defensive sweep: remove any remaining MATLAB path entries that fall
     % under this package's source directory. This catches paths added via
-    % `mip load --addpath`, plus anything load_package.m put on the path
-    % that the mip.json "paths" list or unload_package.m did not cover.
+    % `mip load --addpath` that the mip.json "paths" list did not cover.
     sweepPathEntries(packageDir, fqn, pkgInfo);
 end
 
