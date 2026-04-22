@@ -100,8 +100,8 @@ classdef TestUnloadPackage < matlab.unittest.TestCase
 
         function testUnloadAll_NeverUnloadsMipItself(testCase)
             % Set up mip as loaded and sticky (as mip.m does)
-            mip.state.key_value_append('MIP_LOADED_PACKAGES', 'mip-org/core/mip');
-            mip.state.key_value_append('MIP_STICKY_PACKAGES', 'mip-org/core/mip');
+            mip.state.key_value_append('MIP_LOADED_PACKAGES', 'gh/mip-org/core/mip');
+            mip.state.key_value_append('MIP_STICKY_PACKAGES', 'gh/mip-org/core/mip');
 
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'testpkg');
             mip.load('mip-org/core/testpkg');
@@ -109,7 +109,7 @@ classdef TestUnloadPackage < matlab.unittest.TestCase
             mip.unload('--all', '--force');
 
             % mip should still be loaded
-            testCase.verifyTrue(mip.state.is_loaded('mip-org/core/mip'));
+            testCase.verifyTrue(mip.state.is_loaded('gh/mip-org/core/mip'));
             testCase.verifyFalse(mip.state.is_loaded('mip-org/core/testpkg'));
         end
 

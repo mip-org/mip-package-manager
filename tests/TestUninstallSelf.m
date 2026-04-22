@@ -34,16 +34,18 @@ classdef TestUninstallSelf < matlab.unittest.TestCase
     methods (Test)
 
         function testMipSelfUninstallDetected(testCase)
-            % mip-org/core/mip FQN is correctly identified as the
-            % self-uninstall trigger
+            % The canonical FQN gh/mip-org/core/mip is the self-uninstall
+            % trigger. Input may use the shorthand 'mip-org/core/mip'; the
+            % parser canonicalizes.
             r = mip.parse.parse_package_arg('mip-org/core/mip');
             testCase.verifyTrue(r.is_fqn);
+            testCase.verifyEqual(r.fqn, 'gh/mip-org/core/mip');
             testCase.verifyEqual(r.org, 'mip-org');
             testCase.verifyEqual(r.channel, 'core');
             testCase.verifyEqual(r.name, 'mip');
 
-            resolvedPackages = {'mip-org/core/mip', 'mip-org/core/otherpkg'};
-            testCase.verifyTrue(ismember('mip-org/core/mip', resolvedPackages));
+            resolvedPackages = {'gh/mip-org/core/mip', 'gh/mip-org/core/otherpkg'};
+            testCase.verifyTrue(ismember('gh/mip-org/core/mip', resolvedPackages));
         end
 
         function testSelfUninstallDetectedViaBareNameResolution(testCase)

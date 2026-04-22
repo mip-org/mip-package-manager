@@ -116,8 +116,8 @@ classdef TestLoadPackage < matlab.unittest.TestCase
 
         function testLoadPackage_LocalPackage(testCase)
             createTestPackage(testCase.TestRoot, 'local', 'local', 'devpkg');
-            mip.load('local/local/devpkg');
-            testCase.verifyTrue(mip.state.is_loaded('local/local/devpkg'));
+            mip.load('local/devpkg');
+            testCase.verifyTrue(mip.state.is_loaded('local/devpkg'));
         end
 
         function testLoadPackage_AddsToPath(testCase)

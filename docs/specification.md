@@ -8,13 +8,41 @@ This document is the authoritative reference for the behavior of the MIP package
 
 ### 1.1 Fully Qualified Name (FQN)
 
-Every installed package has a unique **FQN** of the form `org/channel/name` (e.g., `mip-org/core/chebfun`). The three components are:
+Every installed package has a unique **FQN** that begins with a **source-type prefix** indicating where the package came from. The canonical internal form is variable-length:
 
+| Source type | Canonical FQN | Example |
+|---|---|---|
+| `gh` — GitHub channel package | `gh/<org>/<channel>/<name>` | `gh/mip-org/core/chebfun` |
+| `local` — local directory / editable install | `local/<name>` | `local/mypkg` |
+| `fex` — File Exchange / `--url` zip install | `fex/<name>` | `fex/some_fex_pkg` |
+
+For GitHub channel packages:
 - **org** -- the GitHub organization that hosts the channel repository
 - **channel** -- the channel name within that organization
 - **name** -- the package name
 
-All three components must match the regex `^[-a-zA-Z0-9_.]+$` and must not be `.` or `..`.
+All components must match the regex `^[-a-zA-Z0-9_.]+$` and must not be `.` or `..`.
+
+#### 1.1.1 Display Form
+
+The **display form** of a canonical FQN strips the `gh/` prefix only; non-gh FQNs are displayed unchanged. `mip list`, `mip info`, and all install/load/update messages use the display form. `mip.parse.display_fqn` performs the conversion.
+
+| Canonical FQN | Display form |
+|---|---|
+| `gh/mip-org/core/chebfun` | `mip-org/core/chebfun` |
+| `local/mypkg` | `local/mypkg` |
+| `fex/some_fex_pkg` | `fex/some_fex_pkg` |
+
+#### 1.1.2 Accepted User Input
+
+The parser accepts either the canonical form or a shorter form for GitHub packages. Users may omit the `gh/` prefix:
+
+| User input | Interpreted as |
+|---|---|
+| `chebfun` | bare name (resolved via §2.4) |
+| `local/mypkg`, `fex/some_pkg` | 2-part non-gh FQN |
+| `mip-org/core/chebfun` | 3-part, implicit `gh/` prefix (`gh/mip-org/core/chebfun`) |
+| `gh/mip-org/core/chebfun` | 4-part, explicit canonical form |
 
 ### 1.2 Bare Names
 
@@ -45,13 +73,18 @@ Channel strings can be specified as:
 
 A bare channel name (e.g., just `core`) is **invalid** and raises `mip:invalidChannel`.
 
-### 1.6 The `local/local` Channel
+### 1.6 Non-channel Source Types
 
-Packages installed from local directories (both editable and non-editable) are placed under the synthetic channel `local/local`. This is not a real GitHub-hosted channel; it exists only on the local filesystem.
+Packages installed from local directories and from File Exchange / `--url` zips are not hosted on a GitHub channel. They live under top-level source-type prefixes:
 
-### 1.7 The `mip-org/core/mip` Identity
+- `local/<name>` — directory and editable installs
+- `fex/<name>` — File Exchange URLs and `--url` zip installs
 
-The package `mip-org/core/mip` is the package manager itself. It has special protections:
+These are addressed by the source-type prefix directly; no `org/channel` is involved.
+
+### 1.7 The `gh/mip-org/core/mip` Identity
+
+The package `gh/mip-org/core/mip` is the package manager itself. It has special protections:
 
 - It is **always** marked as loaded and sticky when any `mip` command runs.
 - It **cannot** be unloaded via `mip unload` (raises `mip:cannotUnloadMip`).
@@ -59,7 +92,7 @@ The package `mip-org/core/mip` is the package manager itself. It has special pro
 - It is never pruned during dependency pruning.
 - `mip uninstall mip-org/core/mip` triggers a full self-uninstall (see [§6.4](#64-self-uninstall-mip-uninstall-mip)) rather than an ordinary package removal.
 
-**Important**: These protections apply **only** to the exact FQN `mip-org/core/mip`. A package named `mip` on any other channel (e.g., `mylab/custom/mip`, `local/local/mip`) is treated as a normal package. The match is by name equivalence (see [§1.8](#18-name-equivalence)), so `mip-org/core/MIP`, `mip-org/core/Mip`, etc. all refer to the same protected identity.
+**Important**: These protections apply **only** to the exact canonical FQN `gh/mip-org/core/mip`. A package named `mip` on any other channel (e.g., `mylab/custom/mip`) or any `local/mip` or `fex/mip` is treated as a normal package. The match is by name equivalence (see [§1.8](#18-name-equivalence)), so any case variant of `mip` under `gh/mip-org/core/` refers to the same protected identity.
 
 ### 1.8 Name Equivalence
 
@@ -77,7 +110,7 @@ This rule applies **only to the name component** of an FQN. The `org` and `chann
 
 Internally, mip stores names in a single **canonical** form per install. The canonical form is:
 
-- **For an installed package**: the actual on-disk directory name under `<root>/packages/<org>/<channel>/`. Whatever case/separators the directory uses is the canonical form for that install.
+- **For an installed package**: the actual on-disk directory name under `<root>/packages/gh/<org>/<channel>/`. Whatever case/separators the directory uses is the canonical form for that install.
 - **For a not-yet-installed package being installed**: the name as published by its source — the `name` field in the channel index entry, the `name` field in `mip.yaml` (local install), or the `name` field in `mip.json` (mhl install). The on-disk directory is named to match.
 
 This means the on-disk name is always the canonical name, and stored FQNs (`MIP_LOADED_PACKAGES`, `directly_installed.txt`, etc.) are always in canonical form. User input that differs from the canonical form is canonicalized at command entry by case-insensitive lookup against the on-disk directory or the channel index.
@@ -100,10 +133,13 @@ Input is split on `/` after stripping any `@version` suffix:
 
 | Input format | Result |
 |---|---|
-| `name` | bare name: `is_fqn=false`, `org=''`, `channel=''` |
-| `org/channel/name` | FQN: `is_fqn=true`, org/channel/name populated |
-| `a/b` (2 parts) | **Error** `mip:invalidPackageSpec` |
-| `a/b/c/d` (4+ parts) | **Error** `mip:invalidPackageSpec` |
+| `name` | bare name: `is_fqn=false`, `type=''`, `fqn=''` |
+| `type/name` (2 parts, `type != 'gh'`) | non-gh FQN: `type='local'`/`'fex'`/..., `fqn='<type>/<name>'` |
+| `org/channel/name` (3 parts) | gh FQN: `type='gh'`, org/channel/name populated, `fqn='gh/<org>/<channel>/<name>'` |
+| `gh/org/channel/name` (4 parts) | gh FQN (explicit), same result as 3-part form |
+| 2-part input starting with `gh/` | **Error** `mip:invalidPackageSpec` |
+| 4-part input not starting with `gh/` | **Error** `mip:invalidPackageSpec` |
+| 5+ parts | **Error** `mip:invalidPackageSpec` |
 
 Validation rules:
 - Each non-empty component must match `^[-a-zA-Z0-9_.]+$`
@@ -136,7 +172,7 @@ There are **three different resolution contexts** with different priority rules.
 Used by: `mip load`, `mip update`, `mip compile` (when given a bare name)
 
 Priority:
-1. `mip-org/core/<name>` -- if installed
+1. `gh/mip-org/core/<name>` -- if installed
 2. First alphabetically by FQN among all other installed matches
 
 Returns empty string if no match found.
@@ -163,7 +199,7 @@ Used by: `mip uninstall` (when given a bare name)
 Used by: all contexts that resolve dependencies listed in `mip.json` — loading, pruning (unload/uninstall), and broken-dependency checks.
 
 - If the dependency is a FQN, use as-is
-- If bare name, **always** resolve to `mip-org/core/<name>`
+- If bare name, **always** resolve to `gh/mip-org/core/<name>`
 
 To depend on a package from a different channel, use the fully qualified name in `mip.yaml`.
 
@@ -172,7 +208,7 @@ To depend on a package from a different channel, use the fully qualified name in
 Used by: the install process when building the dependency graph from channel indexes
 
 - If the dependency is a FQN, use as-is
-- If bare name, **always** resolve to `mip-org/core/<name>`
+- If bare name, **always** resolve to `gh/mip-org/core/<name>`
 
 This is consistent with the general dependency resolution rule (2.4.4).
 
@@ -246,7 +282,7 @@ Priority: exact match > `numbl_wasm` fallback > `any`.
 #### 3.1.5 Dependency Resolution
 
 1. Build a dependency graph recursively using `build_dependency_graph`.
-2. Bare-name dependencies always resolve to `mip-org/core/<name>` during graph building.
+2. Bare-name dependencies always resolve to `gh/mip-org/core/<name>` during graph building.
 3. FQN dependencies are used as-is.
 4. Circular dependencies are detected and raise `mip:circularDependency`.
 5. If a dependency's channel hasn't been fetched yet, it is fetched lazily.
@@ -259,7 +295,7 @@ Priority: exact match > `numbl_wasm` fallback > `any`.
    - Download the `.mhl` file from the URL in the index.
    - If the channel index entry includes `mhl_sha256`, verify the downloaded file against it. Mismatch raises `mip:digestMismatch` and deletes the corrupted file. Missing digest (legacy releases) or an unavailable JVM (e.g. `numbl_wasm`) silently skips verification. See [§3.6](#36-mhl-archive-integrity).
    - Validate the `.mhl` archive against path-traversal attacks before extraction (see [§3.6](#36-mhl-archive-integrity)).
-   - Extract to `<root>/packages/<org>/<channel>/<name>/`.
+   - Extract to `<root>/packages/gh/<org>/<channel>/<name>/`.
 2. Mark the **user-requested** packages (not their dependencies) as "directly installed" in `directly_installed.txt`.
 3. Print a summary with load hints.
 
@@ -296,7 +332,7 @@ This is the default when installing from a local directory without `-e`/`--edita
 6. Compute addpaths from `mip.yaml` relative to the source subdir.
 7. Run compile script if specified.
 8. Create `mip.json` with metadata, including the `paths` field (list of addpath entries, relative to the package source subdir). `mip.load` resolves these against the installed package dir at load time.
-9. Move staging directory to `<root>/packages/local/local/<name>/`.
+9. Move staging directory to `<root>/packages/local/<name>/`.
 10. Store `source_path` in `mip.json` (for `mip update`).
 11. Mark as directly installed.
 
@@ -304,7 +340,7 @@ This is the default when installing from a local directory without `-e`/`--edita
 
 1. Read `mip.yaml` from the source directory.
 2. Match build and compute addpaths relative to the source directory.
-3. Create a thin wrapper directory at `<root>/packages/local/local/<name>/`.
+3. Create a thin wrapper directory at `<root>/packages/local/<name>/`.
 4. Create `mip.json` with `editable: true`, `source_path`, and the `paths` field (addpath entries relative to the source dir). `mip.load` resolves these against `source_path` at load time.
 5. Store `compile_script` and `test_script` in `mip.json` if present.
 6. If a `compile_script` is defined, **compile by default** (unless `--no-compile`). Packages with no `compile_script` skip this step silently.
@@ -322,14 +358,14 @@ Source file changes are reflected immediately without reinstalling.
 
 Before installing, all dependencies listed in `mip.yaml` are checked:
 - FQN dependencies: check if the directory exists at the expected path.
-- Bare-name dependencies: resolve to `mip-org/core/<name>` and check existence.
+- Bare-name dependencies: resolve to `gh/mip-org/core/<name>` and check existence.
 - If any dependency is missing, raises `mip:dependencyNotFound`.
 
 Note: local install does **not** auto-install dependencies. They must be pre-installed.
 
 #### 3.2.5 Already-Installed Behavior (Local)
 
-If the package is already installed at `local/local/<name>`, prints a message and returns without error. Does not reinstall. Use `mip update` or `mip uninstall` first.
+If the package is already installed at `local/<name>`, prints a message and returns without error. Does not reinstall. Use `mip update` or `mip uninstall` first.
 
 ### 3.3 Installation from `.mhl` File
 
@@ -339,7 +375,7 @@ If the package is already installed at `local/local/<name>`, prints a message an
 2. Validate the archive for path-traversal safety (see [§3.6](#36-mhl-archive-integrity)), then extract and read `mip.json` to get the package name.
 3. If already installed, skip.
 4. Install any dependencies from the remote repository first. These dependencies are **not** marked as directly installed -- only the top-level `.mhl` package is. This lets them be pruned later when their parent is uninstalled.
-5. Move extracted files to `<root>/packages/<org>/<channel>/<name>/`.
+5. Move extracted files to `<root>/packages/gh/<org>/<channel>/<name>/`.
 6. The org/channel is determined by the `--channel` flag (default `mip-org/core`).
 7. Mark the top-level `.mhl` package as directly installed.
 
@@ -424,7 +460,7 @@ If `--install` is specified and the package is not installed, it is automaticall
 
 When loading a package with dependencies (listed in `mip.json`):
 
-1. Each dependency is resolved using `resolve_dependency` ([§2.4.4](#244-resolving-a-bare-name-dependency-resolve_dependency)): bare names always resolve to `mip-org/core/<name>`.
+1. Each dependency is resolved using `resolve_dependency` ([§2.4.4](#244-resolving-a-bare-name-dependency-resolve_dependency)): bare names always resolve to `gh/mip-org/core/<name>`.
 2. Dependencies are loaded recursively before the package itself.
 3. Dependencies are loaded as **non-direct** (they won't appear in `MIP_DIRECTLY_LOADED_PACKAGES`).
 4. Dependencies are loaded as **non-sticky** (even if the parent was loaded with `--sticky`).

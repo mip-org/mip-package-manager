@@ -42,7 +42,7 @@ classdef TestUpdateRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             info1 = mip.config.read_package_json(pkgDir);
             testCase.verifyEqual(info1.version, '1.0.0');
 
@@ -60,7 +60,7 @@ classdef TestUpdateRemote < matlab.unittest.TestCase
             mip.install('mip-org/test-channel1/alpha');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             info1 = mip.config.read_package_json(pkgDir);
             testCase.verifyEqual(info1.version, '2.0.0');
 
@@ -79,7 +79,7 @@ classdef TestUpdateRemote < matlab.unittest.TestCase
             mip.install('mip-org/test-channel1/alpha');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
 
             % Drop a marker file; if force update reinstalls, it will be gone
             marker = fullfile(pkgDir, '.test_marker');
@@ -108,7 +108,7 @@ classdef TestUpdateRemote < matlab.unittest.TestCase
                 'Package should be reloaded after update');
 
             info = mip.config.read_package_json(fullfile(testCase.TestRoot, ...
-                'packages', 'mip-org', 'test-channel1', 'alpha'));
+                'packages', 'gh', 'mip-org', 'test-channel1', 'alpha'));
             testCase.verifyEqual(info.version, '2.0.0', ...
                 'Should be upgraded to latest version');
         end
@@ -124,7 +124,7 @@ classdef TestUpdateRemote < matlab.unittest.TestCase
                 'Package should remain unloaded if it was not loaded before update');
 
             info = mip.config.read_package_json(fullfile(testCase.TestRoot, ...
-                'packages', 'mip-org', 'test-channel1', 'alpha'));
+                'packages', 'gh', 'mip-org', 'test-channel1', 'alpha'));
             testCase.verifyEqual(info.version, '2.0.0', ...
                 'Should be upgraded to latest version');
         end
@@ -138,9 +138,9 @@ classdef TestUpdateRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'gamma');
 
             gammaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'gamma');
+                'gh', 'mip-org', 'test-channel1', 'gamma');
             alphaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
 
             testCase.verifyTrue(exist(gammaDir, 'dir') > 0);
             testCase.verifyTrue(exist(alphaDir, 'dir') > 0);
@@ -186,7 +186,7 @@ classdef TestUpdateRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'gamma');
 
             alphaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             info1 = mip.config.read_package_json(alphaDir);
             testCase.verifyEqual(info1.version, '1.0.0');
 
@@ -209,7 +209,7 @@ classdef TestUpdateRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
 
             alphaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             info1 = mip.config.read_package_json(alphaDir);
             testCase.verifyEqual(info1.version, '1.0.0');
 
@@ -231,7 +231,7 @@ classdef TestUpdateRemote < matlab.unittest.TestCase
             mip.uninstall('mip-org/test-channel1/alpha');
 
             gammaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'gamma');
+                'gh', 'mip-org', 'test-channel1', 'gamma');
 
             % Drop a marker to prove gamma was reinstalled
             marker = fullfile(gammaDir, '.test_marker');

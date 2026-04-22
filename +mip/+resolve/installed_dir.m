@@ -1,9 +1,10 @@
-function name = installed_dir(org, channel, requestedName)
+function name = installed_dir(fqn)
 %INSTALLED_DIR   Find the on-disk directory name for an installed package.
 %
-% Scans `<root>/packages/<org>/<channel>/` for a directory whose name
-% matches requestedName under the equivalence rules of mip.name.match
-% (case-insensitive, dash/underscore-equivalent).
+% Scans the parent directory of the package (determined by its FQN's
+% source-type layout) for an entry whose name matches the FQN's last
+% component under the equivalence rules of mip.name.match (case-
+% insensitive, dash/underscore-equivalent).
 %
 % The returned name is the actual directory name on disk, preserving its
 % case and separators. Callers use this form as the canonical package
@@ -11,9 +12,7 @@ function name = installed_dir(org, channel, requestedName)
 % ismember against already-stored FQNs keeps working.
 %
 % Args:
-%   org           - Organization name (case-sensitive)
-%   channel       - Channel name (case-sensitive)
-%   requestedName - Package name (char or string)
+%   fqn - Canonical FQN (gh/<org>/<channel>/<name>, local/<name>, fex/<name>)
 %
 % Returns:
 %   name - char row vector with the on-disk name, or '' if no matching
@@ -21,17 +20,28 @@ function name = installed_dir(org, channel, requestedName)
 
 name = '';
 
-chanPath = fullfile(mip.paths.get_packages_dir(), char(org), char(channel));
-if ~exist(chanPath, 'dir')
+r = mip.parse.parse_package_arg(fqn);
+if ~r.is_fqn
     return
 end
 
-entries = dir(chanPath);
+packagesDir = mip.paths.get_packages_dir();
+if strcmp(r.type, 'gh')
+    parentDir = fullfile(packagesDir, 'gh', r.org, r.channel);
+else
+    parentDir = fullfile(packagesDir, r.type);
+end
+
+if ~exist(parentDir, 'dir')
+    return
+end
+
+entries = dir(parentDir);
 for i = 1:length(entries)
     if ~entries(i).isdir || startsWith(entries(i).name, '.')
         continue
     end
-    if mip.name.match(entries(i).name, requestedName)
+    if mip.name.match(entries(i).name, r.name)
         name = entries(i).name;
         return
     end

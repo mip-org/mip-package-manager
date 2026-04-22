@@ -4,7 +4,7 @@ function prune_unused_packages()
 % A package is considered needed if it is in `directly_installed.txt` or
 % is a transitive dependency of any directly-installed package.
 %
-% `mip-org/core/mip` (the package manager itself) is never pruned.
+% `gh/mip-org/core/mip` (the package manager itself) is never pruned.
 %
 % Used by:
 %   - `mip uninstall`: prune orphans after removing requested packages.
@@ -31,31 +31,38 @@ function prune_unused_packages()
     neededPackages = unique([directlyInstalled, neededPackages]);
 
     % Find packages to prune (installed but not needed)
-    % Never prune mip-org/core/mip - it is the package manager itself
+    % Never prune gh/mip-org/core/mip - it is the package manager itself
     packagesToPrune = {};
     for i = 1:length(allInstalled)
         fqn = allInstalled{i};
         if ~ismember(fqn, neededPackages) && ...
-                ~strcmp(fqn, 'mip-org/core/mip')
+                ~strcmp(fqn, 'gh/mip-org/core/mip')
             packagesToPrune{end+1} = fqn; %#ok<AGROW>
         end
     end
 
     if ~isempty(packagesToPrune)
-        fprintf('\nPruning unnecessary packages: %s\n', strjoin(packagesToPrune, ', '));
+        displayFqns = cellfun(@mip.parse.display_fqn, packagesToPrune, 'UniformOutput', false);
+        fprintf('\nPruning unnecessary packages: %s\n', strjoin(displayFqns, ', '));
+        packagesDir = mip.paths.get_packages_dir();
         for i = 1:length(packagesToPrune)
             fqn = packagesToPrune{i};
             r = mip.parse.parse_package_arg(fqn);
-            pkgDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
+            pkgDir = mip.paths.get_package_dir(fqn);
 
             try
                 rmdir(pkgDir, 's');
-                fprintf('  Pruned package "%s"\n', fqn);
-                mip.paths.cleanup_empty_dirs(fullfile(mip.paths.get_packages_dir(), r.org, r.channel));
-                mip.paths.cleanup_empty_dirs(fullfile(mip.paths.get_packages_dir(), r.org));
+                fprintf('  Pruned package "%s"\n', mip.parse.display_fqn(fqn));
+                if strcmp(r.type, 'gh')
+                    mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'gh', r.org, r.channel));
+                    mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'gh', r.org));
+                    mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'gh'));
+                else
+                    mip.paths.cleanup_empty_dirs(fullfile(packagesDir, r.type));
+                end
             catch ME
                 warning('mip:pruneFailed', ...
-                        'Failed to prune package "%s": %s', fqn, ME.message);
+                        'Failed to prune package "%s": %s', mip.parse.display_fqn(fqn), ME.message);
             end
         end
     end

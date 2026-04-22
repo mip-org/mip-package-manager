@@ -41,7 +41,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'alpha');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0, ...
                 'Package should be installed at mip-org/test-channel1/alpha');
         end
@@ -51,7 +51,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('mip-org/test-channel2/beta');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'beta');
+                'gh', 'mip-org', 'test-channel2', 'beta');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0, ...
                 'Package should be installed at mip-org/test-channel2/beta');
         end
@@ -61,7 +61,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0, ...
                 'Package should be installed');
 
@@ -79,9 +79,9 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'gamma');
 
             gammaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'gamma');
+                'gh', 'mip-org', 'test-channel1', 'gamma');
             alphaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
 
             testCase.verifyTrue(exist(gammaDir, 'dir') > 0, ...
                 'gamma should be installed');
@@ -96,9 +96,9 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel2', 'cross');
 
             crossDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'cross');
+                'gh', 'mip-org', 'test-channel2', 'cross');
             alphaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
 
             testCase.verifyTrue(exist(crossDir, 'dir') > 0, ...
                 'cross should be installed from test-channel2');
@@ -112,7 +112,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel2', 'cross');
 
             crossDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'cross');
+                'gh', 'mip-org', 'test-channel2', 'cross');
             testCase.verifyTrue(exist(crossDir, 'dir') > 0, ...
                 'cross should be installed');
         end
@@ -125,9 +125,9 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel2', 'shared');
 
             dir1 = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'shared');
+                'gh', 'mip-org', 'test-channel1', 'shared');
             dir2 = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'shared');
+                'gh', 'mip-org', 'test-channel2', 'shared');
 
             testCase.verifyTrue(exist(dir1, 'dir') > 0, ...
                 'shared should be installed from test-channel1');
@@ -142,9 +142,9 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'core_dep');
 
             coreDepDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'core_dep');
+                'gh', 'mip-org', 'test-channel1', 'core_dep');
             chebfunDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'core', 'chebfun');
+                'gh', 'mip-org', 'core', 'chebfun');
 
             testCase.verifyTrue(exist(coreDepDir, 'dir') > 0, ...
                 'core_dep should be installed from test-channel1');
@@ -211,7 +211,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('mip-org/test-channel1/alpha');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0, ...
                 'Package should still be installed');
         end
@@ -224,7 +224,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             info1 = mip.config.read_package_json(pkgDir);
             testCase.verifyEqual(info1.version, '1.0.0');
 
@@ -241,7 +241,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'alpha@2.0.0');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             info1 = mip.config.read_package_json(pkgDir);
             testCase.verifyEqual(info1.version, '2.0.0');
 
@@ -257,7 +257,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             info1 = mip.config.read_package_json(pkgDir);
             timestamp1 = info1.timestamp;
 
@@ -277,7 +277,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'alpha@1.0.0');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             info1 = mip.config.read_package_json(pkgDir);
             testCase.verifyEqual(info1.version, '1.0.0');
 
@@ -299,7 +299,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('mip-org/test-channel1/alpha@1.0.0');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyEqual(info.version, '1.0.0', ...
                 'FQN @version should reach the FQN''s channel');
@@ -326,7 +326,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             testCase.verifyTrue(mip.state.is_loaded('mip-org/test-channel1/alpha'), ...
                 'alpha should be reloaded after the @version replace');
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyEqual(info.version, '2.0.0');
         end
@@ -340,9 +340,9 @@ classdef TestInstallRemote < matlab.unittest.TestCase
                         'mip-org/test-channel1/alpha');
 
             installedDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             wrongDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'alpha');
+                'gh', 'mip-org', 'test-channel2', 'alpha');
 
             testCase.verifyTrue(exist(installedDir, 'dir') > 0, ...
                 'alpha should be installed in test-channel1 (from FQN)');
@@ -358,7 +358,7 @@ classdef TestInstallRemote < matlab.unittest.TestCase
                         'mip-org/test-channel1/alpha');
 
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0, ...
                 'alpha should be installed even with bogus --channel');
         end
@@ -370,9 +370,9 @@ classdef TestInstallRemote < matlab.unittest.TestCase
                         'alpha', 'mip-org/test-channel2/beta');
 
             alphaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             betaDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel2', 'beta');
+                'gh', 'mip-org', 'test-channel2', 'beta');
 
             testCase.verifyTrue(exist(alphaDir, 'dir') > 0, ...
                 'bare-name alpha should be installed from --channel value');
@@ -404,9 +404,9 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             mip.install('--channel', 'mip-org/test-channel1', 'alpha');
 
             channelDir = fullfile(testCase.TestRoot, 'packages', ...
-                'mip-org', 'test-channel1', 'alpha');
+                'gh', 'mip-org', 'test-channel1', 'alpha');
             localPkgDir = fullfile(testCase.TestRoot, 'packages', ...
-                'local', 'local', 'alpha');
+                'local', 'alpha');
 
             testCase.verifyTrue(exist(channelDir, 'dir') > 0, ...
                 'alpha should be installed from test-channel1');

@@ -36,8 +36,7 @@ for i = 1:length(allPackages)
         continue
     end
 
-    r = mip.parse.parse_package_arg(fqn);
-    pkgDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
+    pkgDir = mip.paths.get_package_dir(fqn);
 
     try
         pkgInfo = mip.config.read_package_json(pkgDir);

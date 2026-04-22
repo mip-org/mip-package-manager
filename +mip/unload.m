@@ -41,20 +41,26 @@ function unload(varargin)
         % Resolve to FQN
         fqn = resolveLoadedFqn(packageArg);
 
-        % mip-org/core/mip cannot be unloaded
-        if strcmp(fqn, 'mip-org/core/mip')
+        % gh/mip-org/core/mip cannot be unloaded
+        if strcmp(fqn, 'gh/mip-org/core/mip')
             error('mip:cannotUnloadMip', 'Cannot unload mip itself.');
         end
 
+        displayFqn = mip.parse.display_fqn(fqn);
+
         % Check if package is loaded
         if ~mip.state.is_loaded(fqn)
-            fprintf('Package "%s" is not currently loaded\n', fqn);
+            fprintf('Package "%s" is not currently loaded\n', displayFqn);
             continue
         end
 
         % Get package directory
-        result = mip.parse.parse_package_arg(fqn);
-        packageDir = mip.paths.get_package_dir(result.org, result.channel, result.name);
+        r = mip.parse.parse_package_arg(fqn);
+        if r.is_fqn
+            packageDir = mip.paths.get_package_dir(fqn);
+        else
+            packageDir = '';
+        end
 
         % Execute unload_package.m if it exists
         executeUnload(packageDir, fqn);
@@ -62,7 +68,7 @@ function unload(varargin)
         % Remove from all load-state lists
         mip.state.set_unloaded(fqn);
 
-        fprintf('Unloaded package "%s"\n', fqn);
+        fprintf('Unloaded package "%s"\n', displayFqn);
     end
 
     % Prune packages that are no longer needed (once, after all unloads)
@@ -77,12 +83,14 @@ function fqn = resolveLoadedFqn(packageArg)
     if result.is_fqn
         % Canonicalize to the on-disk name so we match the form stored in
         % MIP_LOADED_PACKAGES. If not installed at all, fall back to the
-        % user-typed form (caller will report "not loaded").
-        onDisk = mip.resolve.installed_dir(result.org, result.channel, result.name);
+        % canonical typed form (caller will report "not loaded").
+        onDisk = mip.resolve.installed_dir(result.fqn);
         if isempty(onDisk)
-            fqn = packageArg;
-        else
+            fqn = result.fqn;
+        elseif strcmp(result.type, 'gh')
             fqn = mip.parse.make_fqn(result.org, result.channel, onDisk);
+        else
+            fqn = [result.type '/' onDisk];
         end
         return
     end
@@ -123,8 +131,13 @@ function fqn = resolveLoadedFqn(packageArg)
 end
 
 function executeUnload(packageDir, fqn)
-    unloadFile = fullfile(packageDir, 'unload_package.m');
-    hasUnloadScript = exist(unloadFile, 'file') ~= 0;
+    displayFqn = mip.parse.display_fqn(fqn);
+    unloadFile = '';
+    hasUnloadScript = false;
+    if ~isempty(packageDir)
+        unloadFile = fullfile(packageDir, 'unload_package.m');
+        hasUnloadScript = exist(unloadFile, 'file') ~= 0;
+    end
 
     % Legacy unload_package.m runs first so it sees the paths it expects
     % to remove before we strip the mip.json "paths" entries.
@@ -136,7 +149,7 @@ function executeUnload(packageDir, fqn)
         catch ME
             warning('mip:unloadError', ...
                     'Error executing unload_package.m for package "%s": %s', ...
-                    fqn, ME.message);
+                    displayFqn, ME.message);
         end
         cd(originalDir);
     end
@@ -145,7 +158,7 @@ function executeUnload(packageDir, fqn)
     % packageDir or unreadable mip.json are non-fatal -- the sweep below
     % is the backstop.
     pkgInfo = [];
-    if isfolder(packageDir)
+    if ~isempty(packageDir) && isfolder(packageDir)
         try
             pkgInfo = mip.config.read_package_json(packageDir);
         catch
@@ -175,7 +188,7 @@ function executeUnload(packageDir, fqn)
     if ~hasUnloadScript && ~hasPathsField
         warning('mip:unloadNotFound', ...
                 'Package "%s" does not have a unload_package.m file. Path changes may persist.', ...
-                fqn);
+                displayFqn);
     end
 
     % Defensive sweep: remove any remaining MATLAB path entries that fall
@@ -189,6 +202,9 @@ function sweepPathEntries(packageDir, fqn, pkgInfo)
 % Remove any MATLAB path entries that lie under the package source dir.
 % Silent if the package was already cleanly unloaded above.
 
+    if isempty(packageDir)
+        return
+    end
     if nargin < 3 || isempty(pkgInfo)
         if ~isfolder(packageDir)
             return
@@ -225,9 +241,10 @@ function sweepPathEntries(packageDir, fqn, pkgInfo)
     end
     oldState = warning('off', 'MATLAB:rmpath:DirNotFound');
     restoreWarn = onCleanup(@() warning(oldState));
+    displayFqn = mip.parse.display_fqn(fqn);
     for k = 1:numel(toRemove)
         rmpath(toRemove{k});
-        fprintf('  swept residual path entry for "%s": %s\n', fqn, toRemove{k});
+        fprintf('  swept residual path entry for "%s": %s\n', displayFqn, toRemove{k});
     end
 end
 
@@ -252,30 +269,31 @@ function pruneUnusedPackages()
     neededPackages = unique([MIP_DIRECTLY_LOADED_PACKAGES, neededPackages]);
 
     % Find packages to prune (loaded but not needed)
-    % Never prune mip-org/core/mip - it is the package manager itself
+    % Never prune gh/mip-org/core/mip - it is the package manager itself
     packagesToPrune = {};
     for i = 1:length(MIP_LOADED_PACKAGES)
         pkg = MIP_LOADED_PACKAGES{i};
-        if ~ismember(pkg, neededPackages) && ~strcmp(pkg, 'mip-org/core/mip')
+        if ~ismember(pkg, neededPackages) && ~strcmp(pkg, 'gh/mip-org/core/mip')
             packagesToPrune{end+1} = pkg;
         end
     end
 
     % Prune each unnecessary package
     if ~isempty(packagesToPrune)
-        fprintf('Pruning unnecessary packages: %s\n', strjoin(packagesToPrune, ', '));
+        displayPrune = cellfun(@mip.parse.display_fqn, packagesToPrune, 'UniformOutput', false);
+        fprintf('Pruning unnecessary packages: %s\n', strjoin(displayPrune, ', '));
         for i = 1:length(packagesToPrune)
             pkg = packagesToPrune{i};
             r = mip.parse.parse_package_arg(pkg);
             if r.is_fqn
-                packageDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
+                packageDir = mip.paths.get_package_dir(pkg);
             else
                 continue  % Skip non-FQN entries (shouldn't happen)
             end
 
             executeUnload(packageDir, pkg);
             mip.state.key_value_remove('MIP_LOADED_PACKAGES', pkg);
-            fprintf('  Pruned package "%s"\n', pkg);
+            fprintf('  Pruned package "%s"\n', mip.parse.display_fqn(pkg));
         end
     end
 
@@ -298,7 +316,7 @@ function unloadAll(forceUnload)
     if forceUnload
         for i = 1:length(MIP_LOADED_PACKAGES)
             pkg = MIP_LOADED_PACKAGES{i};
-            if ~strcmp(pkg, 'mip-org/core/mip')
+            if ~strcmp(pkg, 'gh/mip-org/core/mip')
                 packagesToUnload{end+1} = pkg; %#ok<AGROW>
             end
         end
@@ -314,18 +332,20 @@ function unloadAll(forceUnload)
     if isempty(packagesToUnload)
         fprintf('No packages to unload\n');
         if ~forceUnload && ~isempty(MIP_STICKY_PACKAGES)
-            fprintf('Sticky packages remain: %s\n', strjoin(MIP_STICKY_PACKAGES, ', '));
+            stickyDisplay = cellfun(@mip.parse.display_fqn, MIP_STICKY_PACKAGES, 'UniformOutput', false);
+            fprintf('Sticky packages remain: %s\n', strjoin(stickyDisplay, ', '));
         end
         return
     end
 
+    unloadDisplay = cellfun(@mip.parse.display_fqn, packagesToUnload, 'UniformOutput', false);
     if forceUnload
-        fprintf('Unloading all packages: %s\n', strjoin(packagesToUnload, ', '));
+        fprintf('Unloading all packages: %s\n', strjoin(unloadDisplay, ', '));
     else
         if ~isempty(MIP_STICKY_PACKAGES)
-            fprintf('Unloading all non-sticky packages: %s\n', strjoin(packagesToUnload, ', '));
+            fprintf('Unloading all non-sticky packages: %s\n', strjoin(unloadDisplay, ', '));
         else
-            fprintf('Unloading all packages: %s\n', strjoin(packagesToUnload, ', '));
+            fprintf('Unloading all packages: %s\n', strjoin(unloadDisplay, ', '));
         end
     end
 
@@ -334,19 +354,19 @@ function unloadAll(forceUnload)
         pkg = packagesToUnload{i};
         r = mip.parse.parse_package_arg(pkg);
         if r.is_fqn
-            packageDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
+            packageDir = mip.paths.get_package_dir(pkg);
         else
             packageDir = fullfile(mip.paths.get_packages_dir(), pkg);
         end
         executeUnload(packageDir, pkg);
-        fprintf('  Unloaded package "%s"\n', pkg);
+        fprintf('  Unloaded package "%s"\n', mip.parse.display_fqn(pkg));
     end
 
     % Update global variables (mip always remains)
     if forceUnload
-        MIP_LOADED_PACKAGES = {'mip-org/core/mip'};
+        MIP_LOADED_PACKAGES = {'gh/mip-org/core/mip'};
         MIP_DIRECTLY_LOADED_PACKAGES = {};
-        MIP_STICKY_PACKAGES = {'mip-org/core/mip'};
+        MIP_STICKY_PACKAGES = {'gh/mip-org/core/mip'};
     else
         MIP_LOADED_PACKAGES = MIP_STICKY_PACKAGES;
         MIP_DIRECTLY_LOADED_PACKAGES = MIP_DIRECTLY_LOADED_PACKAGES(    ...

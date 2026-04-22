@@ -1,10 +1,18 @@
 function pkgDir = createTestPackage(rootDir, org, channel, pkgName, varargin)
 %CREATETESTPACKAGE   Create a fake installed mip package for testing.
 %
+% The on-disk layout follows the canonical mip layout:
+%   - For GitHub channel packages (3-arg form): org/channel/name are
+%     provided. The package is created at
+%     <rootDir>/packages/gh/<org>/<channel>/<name>/.
+%   - For non-gh source types (2-arg form): the second positional arg
+%     is the package name, with org/channel omitted or passed as ''.
+%     Pass source-type via the 'type' name-value ('local' or 'fex').
+%
 % Args:
 %   rootDir  - The MIP_ROOT directory (e.g. tempdir)
-%   org      - Organization name (e.g. 'mip-org')
-%   channel  - Channel name (e.g. 'core')
+%   org      - Organization name (e.g. 'mip-org'). Use '' for non-gh.
+%   channel  - Channel name (e.g. 'core'). Use '' for non-gh.
 %   pkgName  - Package name (e.g. 'testpkg')
 %
 % Optional name-value pairs:
@@ -30,9 +38,29 @@ addParameter(p, 'dependencies', {}, @iscell);
 addParameter(p, 'sourceSubdir', false, @islogical);
 addParameter(p, 'subdirs', {}, @iscell);
 addParameter(p, 'style', 'both', @(s) ischar(s) && ismember(s, {'legacy', 'new', 'both'}));
+addParameter(p, 'type', '', @ischar);
 parse(p, varargin{:});
 
-pkgDir = fullfile(rootDir, 'packages', org, channel, pkgName);
+sourceType = p.Results.type;
+if isempty(sourceType)
+    % Back-compat: if the caller passed 'local', 'local' or 'fex', 'fex',
+    % treat it as the corresponding non-gh source type (shorthand used by
+    % older test fixtures).
+    if strcmp(org, channel) && (strcmp(org, 'local') || strcmp(org, 'fex'))
+        sourceType = org;
+    elseif isempty(org) && isempty(channel)
+        error('createTestPackage:invalidArgs', ...
+              'org/channel must be given for gh packages, or pass type=''local''/''fex''.');
+    else
+        sourceType = 'gh';
+    end
+end
+
+if strcmp(sourceType, 'gh')
+    pkgDir = fullfile(rootDir, 'packages', 'gh', org, channel, pkgName);
+else
+    pkgDir = fullfile(rootDir, 'packages', sourceType, pkgName);
+end
 style = p.Results.style;
 useSourceSubdir = p.Results.sourceSubdir;
 

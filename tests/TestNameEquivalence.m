@@ -28,7 +28,7 @@ classdef TestNameEquivalence < matlab.unittest.TestCase
 
     methods (Access = private)
         function makePkgDir(testCase, org, channel, name)
-            mkdir(fullfile(testCase.TestRoot, 'packages', org, channel, name));
+            mkdir(fullfile(testCase.TestRoot, 'packages', 'gh', org, channel, name));
         end
     end
 
@@ -115,40 +115,40 @@ classdef TestNameEquivalence < matlab.unittest.TestCase
         function testInstalledDirExactMatch(testCase)
             testCase.makePkgDir('mip-org', 'core', 'chebfun');
             testCase.verifyEqual( ...
-                mip.resolve.installed_dir('mip-org', 'core', 'chebfun'), ...
+                mip.resolve.installed_dir('gh/mip-org/core/chebfun'), ...
                 'chebfun');
         end
 
         function testInstalledDirCaseInsensitive(testCase)
             testCase.makePkgDir('mip-org', 'core', 'ChebFun');
             testCase.verifyEqual( ...
-                mip.resolve.installed_dir('mip-org', 'core', 'chebfun'), ...
+                mip.resolve.installed_dir('gh/mip-org/core/chebfun'), ...
                 'ChebFun');
         end
 
         function testInstalledDirDashUnderscore(testCase)
             testCase.makePkgDir('mip-org', 'core', 'my-pkg');
             testCase.verifyEqual( ...
-                mip.resolve.installed_dir('mip-org', 'core', 'my_pkg'), ...
+                mip.resolve.installed_dir('gh/mip-org/core/my_pkg'), ...
                 'my-pkg');
         end
 
         function testInstalledDirCombined(testCase)
             testCase.makePkgDir('mip-org', 'core', 'My-Pkg');
             testCase.verifyEqual( ...
-                mip.resolve.installed_dir('mip-org', 'core', 'MY_PKG'), ...
+                mip.resolve.installed_dir('gh/mip-org/core/MY_PKG'), ...
                 'My-Pkg');
         end
 
         function testInstalledDirNotFound(testCase)
             testCase.verifyEqual( ...
-                mip.resolve.installed_dir('mip-org', 'core', 'nonexistent'), ...
+                mip.resolve.installed_dir('gh/mip-org/core/nonexistent'), ...
                 '');
         end
 
         function testInstalledDirMissingChannel(testCase)
             testCase.verifyEqual( ...
-                mip.resolve.installed_dir('mip-org', 'missing', 'x'), ...
+                mip.resolve.installed_dir('gh/mip-org/missing/x'), ...
                 '');
         end
 
@@ -165,8 +165,8 @@ classdef TestNameEquivalence < matlab.unittest.TestCase
             m = mip.resolve.build_package_info_map(index, 'mip-org', 'core');
 
             testCase.verifyEqual(m.Count, uint64(2));
-            testCase.verifyTrue(m.isKey('mip-org/core/mypkg'));
-            testCase.verifyTrue(m.isKey('mip-org/core/my-pkg'));
+            testCase.verifyTrue(m.isKey('gh/mip-org/core/mypkg'));
+            testCase.verifyTrue(m.isKey('gh/mip-org/core/my-pkg'));
         end
 
     end

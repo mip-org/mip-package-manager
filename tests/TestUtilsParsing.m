@@ -1,6 +1,6 @@
 classdef TestUtilsParsing < matlab.unittest.TestCase
 %TESTUTILSPARSING   Tests for parse_package_arg, parse_channel_spec,
-%   parse_channel_flag, and make_fqn utility functions.
+%   parse_channel_flag, display_fqn, and make_fqn utility functions.
 
     methods (Test)
 
@@ -9,19 +9,53 @@ classdef TestUtilsParsing < matlab.unittest.TestCase
         function testParseBarePackageName(testCase)
             r = mip.parse.parse_package_arg('chebfun');
             testCase.verifyEqual(r.name, 'chebfun');
+            testCase.verifyEqual(r.type, '');
             testCase.verifyEqual(r.org, '');
             testCase.verifyEqual(r.channel, '');
+            testCase.verifyEqual(r.fqn, '');
             testCase.verifyFalse(r.is_fqn);
             testCase.verifyEqual(r.version, '');
         end
 
-        function testParseFQN(testCase)
+        function testParseGhShorthand(testCase)
+            % 3-part shorthand: treated as gh/<org>/<channel>/<name>
             r = mip.parse.parse_package_arg('mip-org/core/chebfun');
             testCase.verifyEqual(r.name, 'chebfun');
+            testCase.verifyEqual(r.type, 'gh');
             testCase.verifyEqual(r.org, 'mip-org');
             testCase.verifyEqual(r.channel, 'core');
+            testCase.verifyEqual(r.fqn, 'gh/mip-org/core/chebfun');
             testCase.verifyTrue(r.is_fqn);
             testCase.verifyEqual(r.version, '');
+        end
+
+        function testParseGhExplicit(testCase)
+            % 4-part canonical form
+            r = mip.parse.parse_package_arg('gh/mip-org/core/chebfun');
+            testCase.verifyEqual(r.name, 'chebfun');
+            testCase.verifyEqual(r.type, 'gh');
+            testCase.verifyEqual(r.org, 'mip-org');
+            testCase.verifyEqual(r.channel, 'core');
+            testCase.verifyEqual(r.fqn, 'gh/mip-org/core/chebfun');
+            testCase.verifyTrue(r.is_fqn);
+        end
+
+        function testParseLocalFqn(testCase)
+            r = mip.parse.parse_package_arg('local/mypkg');
+            testCase.verifyEqual(r.name, 'mypkg');
+            testCase.verifyEqual(r.type, 'local');
+            testCase.verifyEqual(r.org, '');
+            testCase.verifyEqual(r.channel, '');
+            testCase.verifyEqual(r.fqn, 'local/mypkg');
+            testCase.verifyTrue(r.is_fqn);
+        end
+
+        function testParseFexFqn(testCase)
+            r = mip.parse.parse_package_arg('fex/fex_pkg');
+            testCase.verifyEqual(r.name, 'fex_pkg');
+            testCase.verifyEqual(r.type, 'fex');
+            testCase.verifyEqual(r.fqn, 'fex/fex_pkg');
+            testCase.verifyTrue(r.is_fqn);
         end
 
         function testParseBareNameWithVersion(testCase)
@@ -31,30 +65,55 @@ classdef TestUtilsParsing < matlab.unittest.TestCase
             testCase.verifyEqual(r.version, '1.2.0');
         end
 
-        function testParseFQNWithVersion(testCase)
+        function testParseGhShorthandWithVersion(testCase)
             r = mip.parse.parse_package_arg('mip-org/core/mip@main');
             testCase.verifyEqual(r.name, 'mip');
+            testCase.verifyEqual(r.type, 'gh');
             testCase.verifyEqual(r.org, 'mip-org');
             testCase.verifyEqual(r.channel, 'core');
+            testCase.verifyEqual(r.fqn, 'gh/mip-org/core/mip');
             testCase.verifyTrue(r.is_fqn);
             testCase.verifyEqual(r.version, 'main');
         end
 
-        function testParseFQNCustomOrg(testCase)
+        function testParseGhExplicitWithVersion(testCase)
+            r = mip.parse.parse_package_arg('gh/mip-org/core/mip@main');
+            testCase.verifyEqual(r.name, 'mip');
+            testCase.verifyEqual(r.fqn, 'gh/mip-org/core/mip');
+            testCase.verifyEqual(r.version, 'main');
+        end
+
+        function testParseLocalFqnWithVersion(testCase)
+            r = mip.parse.parse_package_arg('local/mypkg@1.0.0');
+            testCase.verifyEqual(r.name, 'mypkg');
+            testCase.verifyEqual(r.type, 'local');
+            testCase.verifyEqual(r.fqn, 'local/mypkg');
+            testCase.verifyEqual(r.version, '1.0.0');
+        end
+
+        function testParseGhShorthandCustomOrg(testCase)
             r = mip.parse.parse_package_arg('mylab/custom/mypkg');
             testCase.verifyEqual(r.name, 'mypkg');
+            testCase.verifyEqual(r.type, 'gh');
             testCase.verifyEqual(r.org, 'mylab');
             testCase.verifyEqual(r.channel, 'custom');
+            testCase.verifyEqual(r.fqn, 'gh/mylab/custom/mypkg');
             testCase.verifyTrue(r.is_fqn);
         end
 
-        function testParseInvalidTwoParts(testCase)
-            testCase.verifyError(@() mip.parse.parse_package_arg('a/b'), ...
+        function testParseTwoPartGhErrors(testCase)
+            % 'gh/foo' is incomplete and should be rejected.
+            testCase.verifyError(@() mip.parse.parse_package_arg('gh/foo'), ...
                 'mip:invalidPackageSpec');
         end
 
-        function testParseInvalidFourParts(testCase)
-            testCase.verifyError(@() mip.parse.parse_package_arg('a/b/c/d'), ...
+        function testParseFourPartNonGhErrors(testCase)
+            testCase.verifyError(@() mip.parse.parse_package_arg('zz/org/ch/pkg'), ...
+                'mip:invalidPackageSpec');
+        end
+
+        function testParseFivePartErrors(testCase)
+            testCase.verifyError(@() mip.parse.parse_package_arg('a/b/c/d/e'), ...
                 'mip:invalidPackageSpec');
         end
 
@@ -153,17 +212,22 @@ classdef TestUtilsParsing < matlab.unittest.TestCase
 
         function testMakeFqn(testCase)
             fqn = mip.parse.make_fqn('mip-org', 'core', 'chebfun');
-            testCase.verifyEqual(fqn, 'mip-org/core/chebfun');
+            testCase.verifyEqual(fqn, 'gh/mip-org/core/chebfun');
         end
 
         function testMakeFqnCustomOrg(testCase)
             fqn = mip.parse.make_fqn('mylab', 'custom', 'mypkg');
-            testCase.verifyEqual(fqn, 'mylab/custom/mypkg');
+            testCase.verifyEqual(fqn, 'gh/mylab/custom/mypkg');
         end
 
-        function testMakeFqnLocal(testCase)
-            fqn = mip.parse.make_fqn('local', 'local', 'testpkg');
-            testCase.verifyEqual(fqn, 'local/local/testpkg');
+        function testMakeLocalFqn(testCase)
+            fqn = mip.parse.make_local_fqn('testpkg');
+            testCase.verifyEqual(fqn, 'local/testpkg');
+        end
+
+        function testMakeFexFqn(testCase)
+            fqn = mip.parse.make_fex_fqn('testpkg');
+            testCase.verifyEqual(fqn, 'fex/testpkg');
         end
 
         function testMakeFqnRoundTrip(testCase)
@@ -172,7 +236,26 @@ classdef TestUtilsParsing < matlab.unittest.TestCase
             testCase.verifyEqual(r.org, 'mip-org');
             testCase.verifyEqual(r.channel, 'core');
             testCase.verifyEqual(r.name, 'chebfun');
+            testCase.verifyEqual(r.type, 'gh');
             testCase.verifyTrue(r.is_fqn);
+        end
+
+        %% display_fqn tests
+
+        function testDisplayFqnStripsGh(testCase)
+            testCase.verifyEqual( ...
+                mip.parse.display_fqn('gh/mip-org/core/chebfun'), ...
+                'mip-org/core/chebfun');
+        end
+
+        function testDisplayFqnLocalUnchanged(testCase)
+            testCase.verifyEqual( ...
+                mip.parse.display_fqn('local/mypkg'), 'local/mypkg');
+        end
+
+        function testDisplayFqnFexUnchanged(testCase)
+            testCase.verifyEqual( ...
+                mip.parse.display_fqn('fex/bar'), 'fex/bar');
         end
 
     end

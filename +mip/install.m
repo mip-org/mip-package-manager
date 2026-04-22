@@ -109,11 +109,19 @@ function install(varargin)
         elseif isLocalPathArg(pkg)
             localPaths{end+1} = pkg; %#ok<AGROW>
         else
-            parts = strsplit(pkg, '/');
-            if length(parts) ~= 1 && length(parts) ~= 3
+            try
+                parsed = mip.parse.parse_package_arg(pkg);
+            catch
                 error('mip:install:invalidPackageSpec', ...
                       ['Invalid package specifier "%s".\n' ...
                        'Use "package" for a bare name or "org/channel/package" for a fully qualified name.\n' ...
+                       'To install a local package, prefix the path with "./":\n' ...
+                       '  mip install ./%s'], pkg, pkg);
+            end
+            if parsed.is_fqn && ~strcmp(parsed.type, 'gh')
+                error('mip:install:invalidPackageSpec', ...
+                      ['Invalid package specifier "%s".\n' ...
+                       'Only GitHub channel packages can be installed from a repository.\n' ...
                        'To install a local package, prefix the path with "./":\n' ...
                        '  mip install ./%s'], pkg, pkg);
             end
@@ -144,7 +152,7 @@ function install(varargin)
                        'Install aborted.'], localPath);
             end
         end
-        mip.build.install_local(localPath, editable, noCompile);
+        mip.build.install_local(localPath, editable, noCompile, 'local');
     end
 
     % If only local installs were requested, we're done
@@ -278,19 +286,19 @@ function installedFqns = installFromRepository(repoPackages, channel, markDirect
             if unavailablePackages.isKey(s.fqn)
                 archs = unavailablePackages(s.fqn);
                 fprintf('\nError: Package "%s" is not available for architecture "%s"\n', ...
-                        s.fqn, currentArch);
+                        mip.parse.display_fqn(s.fqn), currentArch);
                 fprintf('Available architectures: %s\n', strjoin(archs, ', '));
                 error('mip:packageUnavailable', 'Package not available for this architecture');
             else
                 error('mip:packageNotFound', ...
-                      'Package "%s" not found in repository', s.fqn);
+                      'Package "%s" not found in repository', mip.parse.display_fqn(s.fqn));
             end
         end
     end
 
     % Resolve dependencies
     if length(resolvedPackages) == 1
-        fprintf('Resolving dependencies for "%s"...\n', resolvedPackages{1}.fqn);
+        fprintf('Resolving dependencies for "%s"...\n', mip.parse.display_fqn(resolvedPackages{1}.fqn));
     else
         fprintf('Resolving dependencies for %d packages...\n', length(resolvedPackages));
     end
@@ -316,8 +324,8 @@ function installedFqns = installFromRepository(repoPackages, channel, markDirect
         fetchedNew = false;
         for i = 1:length(allMissing)
             parsed = mip.parse.parse_package_arg(allMissing{i});
-            if ~parsed.is_fqn
-                error('mip:packageNotFound', 'Package "%s" not found in repository', allMissing{i});
+            if ~parsed.is_fqn || ~strcmp(parsed.type, 'gh')
+                error('mip:packageNotFound', 'Package "%s" not found in repository', mip.parse.display_fqn(allMissing{i}));
             end
             missingChannel = [parsed.org '/' parsed.channel];
             if fetchedChannels.isKey(missingChannel)
@@ -330,8 +338,9 @@ function installedFqns = installFromRepository(repoPackages, channel, markDirect
 
         if ~fetchedNew
             % All channels already fetched but packages still missing
+            missingDisplay = cellfun(@mip.parse.display_fqn, allMissing, 'UniformOutput', false);
             error('mip:packageNotFound', ...
-                  'Package(s) not found in repository: %s', strjoin(allMissing, ', '));
+                  'Package(s) not found in repository: %s', strjoin(missingDisplay, ', '));
         end
     end
     allRequiredFqns = unique(allRequiredFqns, 'stable');
@@ -351,18 +360,19 @@ function installedFqns = installFromRepository(repoPackages, channel, markDirect
     for i = 1:length(allPackagesToInstall)
         fqn = allPackagesToInstall{i};
         result = mip.parse.parse_package_arg(fqn);
-        existingName = mip.resolve.installed_dir(result.org, result.channel, result.name);
+        existingName = mip.resolve.installed_dir(fqn);
         if ~isempty(existingName) && ~strcmp(existingName, result.name)
             existingFqn = mip.parse.make_fqn(result.org, result.channel, existingName);
             error('mip:install:equivalentAlreadyInstalled', ...
                   ['Cannot install "%s": an equivalent package "%s" is already installed. ' ...
                    'Package names are equivalent when they match after lowercasing and ' ...
                    'treating "-" and "_" as the same character. Uninstall "%s" first.'], ...
-                  fqn, existingFqn, existingFqn);
+                  mip.parse.display_fqn(fqn), mip.parse.display_fqn(existingFqn), ...
+                  mip.parse.display_fqn(existingFqn));
         end
-        pkgDir = mip.paths.get_package_dir(result.org, result.channel, result.name);
+        pkgDir = mip.paths.get_package_dir(fqn);
         if exist(pkgDir, 'dir')
-            fprintf('Package "%s" is already installed\n', fqn);
+            fprintf('Package "%s" is already installed\n', mip.parse.display_fqn(fqn));
         else
             toInstallFqns{end+1} = fqn; %#ok<AGROW>
         end
@@ -376,7 +386,7 @@ function installedFqns = installFromRepository(repoPackages, channel, markDirect
             fprintf('\nInstallation plan (%d packages):\n', length(toInstallFqns));
         end
         for i = 1:length(toInstallFqns)
-            fprintf('  - %s %s\n', toInstallFqns{i}, packageInfoMap(toInstallFqns{i}).version);
+            fprintf('  - %s %s\n', mip.parse.display_fqn(toInstallFqns{i}), packageInfoMap(toInstallFqns{i}).version);
         end
         fprintf('\n');
 
@@ -385,8 +395,7 @@ function installedFqns = installFromRepository(repoPackages, channel, markDirect
         try
             for i = 1:length(toInstallFqns)
                 fqn = toInstallFqns{i};
-                result = mip.parse.parse_package_arg(fqn);
-                pkgDir = mip.paths.get_package_dir(result.org, result.channel, result.name);
+                pkgDir = mip.paths.get_package_dir(fqn);
                 downloadAndInstall(fqn, packageInfoMap(fqn), pkgDir);
             end
         catch ME
@@ -427,7 +436,7 @@ function installedFqns = installFromRepository(repoPackages, channel, markDirect
         if length(allInstalled) > 1
             fprintf('\nWarning: Package "%s" is installed from multiple channels:\n', s.name);
             for k = 1:length(allInstalled)
-                fprintf('  - %s\n', allInstalled{k});
+                fprintf('  - %s\n', mip.parse.display_fqn(allInstalled{k}));
             end
         end
     end
@@ -442,7 +451,7 @@ function reloadAfterInstall = replaceExistingVersions(resolvedPackages, packageI
         if isempty(s.requested_version)
             continue;
         end
-        pkgDir = mip.paths.get_package_dir(s.org, s.channel, s.name);
+        pkgDir = mip.paths.get_package_dir(s.fqn);
         if ~exist(pkgDir, 'dir')
             continue;
         end
@@ -455,7 +464,7 @@ function reloadAfterInstall = replaceExistingVersions(resolvedPackages, packageI
             continue;
         end
         fprintf('Replacing "%s" %s with requested version %s...\n', ...
-                s.fqn, installedInfo.version, s.requested_version);
+                mip.parse.display_fqn(s.fqn), installedInfo.version, s.requested_version);
         if mip.state.is_loaded(s.fqn)
             mip.unload(s.fqn);
             reloadAfterInstall{end+1} = s.fqn; %#ok<AGROW>
@@ -487,36 +496,37 @@ function installedFqn = installFromMhl(mhlSource, ~, channel)
         packageName = pkgInfo.name;
         fqn = mip.parse.make_fqn(org, channelName, packageName);
 
-        existingName = mip.resolve.installed_dir(org, channelName, packageName);
+        existingName = mip.resolve.installed_dir(fqn);
         if ~isempty(existingName) && ~strcmp(existingName, packageName)
             existingFqn = mip.parse.make_fqn(org, channelName, existingName);
             error('mip:install:equivalentAlreadyInstalled', ...
                   ['Cannot install "%s": an equivalent package "%s" is already installed. ' ...
                    'Package names are equivalent when they match after lowercasing and ' ...
                    'treating "-" and "_" as the same character. Uninstall "%s" first.'], ...
-                  fqn, existingFqn, existingFqn);
+                  mip.parse.display_fqn(fqn), mip.parse.display_fqn(existingFqn), ...
+                  mip.parse.display_fqn(existingFqn));
         end
 
-        pkgDir = mip.paths.get_package_dir(org, channelName, packageName);
+        pkgDir = mip.paths.get_package_dir(fqn);
         if exist(pkgDir, 'dir')
-            fprintf('Package "%s" is already installed\n', fqn);
+            fprintf('Package "%s" is already installed\n', mip.parse.display_fqn(fqn));
             return
         end
 
         if ~isempty(pkgInfo.dependencies)
             fprintf('\nPackage "%s" has dependencies: %s\n', ...
-                    fqn, strjoin(pkgInfo.dependencies, ', '));
+                    mip.parse.display_fqn(fqn), strjoin(pkgInfo.dependencies, ', '));
             fprintf('Installing dependencies from remote repository...\n');
             installFromRepository(pkgInfo.dependencies, channel, false);
         end
 
-        fprintf('\nInstalling "%s"...\n', fqn);
+        fprintf('\nInstalling "%s"...\n', mip.parse.display_fqn(fqn));
         parentDir = fileparts(pkgDir);
         if ~exist(parentDir, 'dir')
             mkdir(parentDir);
         end
         movefile(extractDir, pkgDir);
-        fprintf('Successfully installed "%s"\n', fqn);
+        fprintf('Successfully installed "%s"\n', mip.parse.display_fqn(fqn));
         mip.state.add_directly_installed(fqn);
         installedFqn = fqn;
 
@@ -535,7 +545,7 @@ end
 function downloadAndInstall(fqn, packageInfo, pkgDir)
 % Download and install a single package.
 
-    fprintf('Downloading %s %s...\n', fqn, packageInfo.version);
+    fprintf('Downloading %s %s...\n', mip.parse.display_fqn(fqn), packageInfo.version);
 
     tempDir = tempname;
     mkdir(tempDir);
@@ -554,7 +564,7 @@ function downloadAndInstall(fqn, packageInfo, pkgDir)
             mkdir(parentDir);
         end
         movefile(stagingDir, pkgDir);
-        fprintf('Successfully installed "%s"\n', fqn);
+        fprintf('Successfully installed "%s"\n', mip.parse.display_fqn(fqn));
     catch ME
         if exist(pkgDir, 'dir')
             rmdir(pkgDir, 's');
@@ -700,7 +710,7 @@ function installFromUrlFlag(args, zipUrl, editable, noCompile)
         fprintf('\n');
     end
 
-    mip.build.install_local(sourceDir, false, noCompile);
+    mip.build.install_local(sourceDir, false, noCompile, 'fex');
 
     % Clear source_path in the installed mip.json. `install_local` records
     % the extracted source dir, but that temp dir is deleted when this
@@ -711,7 +721,7 @@ function installFromUrlFlag(args, zipUrl, editable, noCompile)
 end
 
 function clearSourcePath(pkgName)
-    mipJsonPath = fullfile(mip.paths.get_package_dir('local', 'local', pkgName), 'mip.json');
+    mipJsonPath = fullfile(mip.paths.get_package_dir(mip.parse.make_fex_fqn(pkgName)), 'mip.json');
     if ~isfile(mipJsonPath)
         return
     end

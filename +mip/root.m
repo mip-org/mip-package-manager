@@ -8,7 +8,7 @@ function root = root()
 %
 %   When MIP_ROOT is unset (or empty), the root is determined by navigating
 %   up from this file's installed location, assuming the layout:
-%     <root>/packages/mip-org/core/mip/mip/+mip/root.m
+%     <root>/packages/gh/mip-org/core/mip/mip/+mip/root.m
 
 root = getenv('MIP_ROOT');
 if ~isempty(root)
@@ -26,13 +26,14 @@ if ~isempty(root)
 end
 
 % Navigate up from this file's location:
-%   +mip/root -> +mip -> mip (source) -> mip (package) -> core -> mip-org -> packages -> root
+%   +mip/root -> +mip -> mip (source) -> mip (package) -> core -> mip-org -> gh -> packages -> root
 this_dir     = fileparts(mfilename('fullpath')); % .../+mip
 source_dir   = fileparts(this_dir);              % .../mip/mip
 package_dir  = fileparts(source_dir);            % .../core/mip
 channel_dir  = fileparts(package_dir);           % .../mip-org/core
-org_dir      = fileparts(channel_dir);           % .../packages/mip-org
-packages_dir = fileparts(org_dir);               % .../packages
+org_dir      = fileparts(channel_dir);           % .../gh/mip-org
+gh_dir       = fileparts(org_dir);               % .../packages/gh
+packages_dir = fileparts(gh_dir);                % .../packages
 root         = fileparts(packages_dir);          % .../root
 
 if ~isfolder(fullfile(root, 'packages'))

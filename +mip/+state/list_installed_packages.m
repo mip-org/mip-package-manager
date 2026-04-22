@@ -1,8 +1,16 @@
 function packages = list_installed_packages()
 %LIST_INSTALLED_PACKAGES   List all installed packages as fully qualified names.
 %
+% Walks the on-disk packages tree and returns canonical FQNs:
+%   packages/gh/<org>/<channel>/<name>  ->  gh/<org>/<channel>/<name>
+%   packages/local/<name>               ->  local/<name>
+%   packages/fex/<name>                 ->  fex/<name>
+%
+% Non-'gh' top-level entries are treated as source-type roots with a
+% single level of package directories below them (variable-length FQN).
+%
 % Returns:
-%   packages - Cell array of FQN strings like {'mip-org/core/chebfun', ...}
+%   packages - Cell array of FQN strings, sorted.
 
 packages = {};
 
@@ -11,28 +19,49 @@ if ~exist(packagesDir, 'dir')
     return
 end
 
-orgDirs = dir(packagesDir);
-for i = 1:length(orgDirs)
-    if ~orgDirs(i).isdir || startsWith(orgDirs(i).name, '.')
+topEntries = dir(packagesDir);
+for i = 1:length(topEntries)
+    if ~topEntries(i).isdir || startsWith(topEntries(i).name, '.')
         continue
     end
-    org = orgDirs(i).name;
-    orgPath = fullfile(packagesDir, org);
+    topName = topEntries(i).name;
+    topPath = fullfile(packagesDir, topName);
 
-    chanDirs = dir(orgPath);
-    for j = 1:length(chanDirs)
-        if ~chanDirs(j).isdir || startsWith(chanDirs(j).name, '.')
-            continue
-        end
-        ch = chanDirs(j).name;
-        chanPath = fullfile(orgPath, ch);
-
-        pkgDirs = dir(chanPath);
-        for k = 1:length(pkgDirs)
-            if ~pkgDirs(k).isdir || startsWith(pkgDirs(k).name, '.')
+    if strcmp(topName, 'gh')
+        % gh/<org>/<channel>/<pkg>
+        orgDirs = dir(topPath);
+        for j = 1:length(orgDirs)
+            if ~orgDirs(j).isdir || startsWith(orgDirs(j).name, '.')
                 continue
             end
-            packages{end+1} = mip.parse.make_fqn(org, ch, pkgDirs(k).name); %#ok<AGROW>
+            org = orgDirs(j).name;
+            orgPath = fullfile(topPath, org);
+
+            chanDirs = dir(orgPath);
+            for k = 1:length(chanDirs)
+                if ~chanDirs(k).isdir || startsWith(chanDirs(k).name, '.')
+                    continue
+                end
+                ch = chanDirs(k).name;
+                chanPath = fullfile(orgPath, ch);
+
+                pkgDirs = dir(chanPath);
+                for m = 1:length(pkgDirs)
+                    if ~pkgDirs(m).isdir || startsWith(pkgDirs(m).name, '.')
+                        continue
+                    end
+                    packages{end+1} = mip.parse.make_fqn(org, ch, pkgDirs(m).name); %#ok<AGROW>
+                end
+            end
+        end
+    else
+        % <type>/<pkg>  (local, fex, ...)
+        pkgDirs = dir(topPath);
+        for j = 1:length(pkgDirs)
+            if ~pkgDirs(j).isdir || startsWith(pkgDirs(j).name, '.')
+                continue
+            end
+            packages{end+1} = [topName '/' pkgDirs(j).name]; %#ok<AGROW>
         end
     end
 end

@@ -24,11 +24,12 @@ function pin(varargin)
                   'Package "%s" is not installed.', packageArg);
         end
 
+        displayFqn = mip.parse.display_fqn(r.fqn);
         if mip.state.is_pinned(r.fqn)
-            fprintf('Package "%s" is already pinned.\n', r.fqn);
+            fprintf('Package "%s" is already pinned.\n', displayFqn);
         else
             mip.state.add_pinned(r.fqn);
-            fprintf('Pinned "%s".\n', r.fqn);
+            fprintf('Pinned "%s".\n', displayFqn);
         end
     end
 end
