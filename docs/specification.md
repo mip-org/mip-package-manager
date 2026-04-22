@@ -649,7 +649,7 @@ Packages can be **pinned** to protect them from `mip update --all`; see [§7.11]
 6. For each remaining package, decide whether it needs updating:
    - `--force`: always yes.
    - Local package: always yes (no up-to-date check).
-   - Remote package: fetch the channel index and compare installed version + commit hash with latest:
+   - Remote package: fetch the channel index and pick the target version (see [§7.1.1](#711-target-version-selection-for-update)), then compare installed version + commit hash with the target:
      - Same version **and** same commit hash (or no hash available): "already up to date", skip.
      - Same version but different commit hash: update (content changed within the same version).
      - Different version: update.
@@ -659,6 +659,17 @@ Packages can be **pinned** to protect them from `mip update --all`; see [§7.11]
    - **Remote packages** are updated via staging: unload if loaded, download and extract the new version to a temporary staging directory, then move the old directory to a backup and move the staged version into place. If the swap fails, the backup is restored. The old package is never destroyed until the new version is fully in place. The `directly_installed.txt` entry is preserved (no removal/re-addition). Then install any missing dependencies that the updated packages require, and prune any orphaned packages.
    - Reload every package in the pre-update `MIP_LOADED_PACKAGES` snapshot that is not currently loaded and whose directory exists. Packages that were in the snapshot but are no longer installed are skipped with a warning.
    - Restore `MIP_DIRECTLY_LOADED_PACKAGES` to the pre-update snapshot (filtered to entries that are actually loaded now) so that packages which were only transitively loaded before the update remain only transitively loaded after.
+
+#### 7.1.1 Target Version Selection for Update
+
+`mip update` does **not** always pick the channel's best version as the update target. If the installed version is **non-numeric** (e.g., `main`, `master`, `unspecified`), the update stays on that version track — the target is the same version in the channel, and only the commit hash is refreshed. This preserves the user's deliberate choice to track a branch and prevents `mip update` from silently switching to a numeric release that appears alongside the branch.
+
+Behavior by installed version:
+
+- **Non-numeric installed version** (e.g., `main`): target = same non-numeric version in the channel. If that version no longer exists in the channel, `mip:versionNotFound` is raised and the installed package is left untouched. To switch tracks, the user must explicitly `mip install X@<version>`.
+- **Numeric installed version** (e.g., `1.0.0`): target = channel's best version per [§3.1.3](#313-version-selection-select_best_version) (typically the highest numeric version).
+
+This rule only governs **implicit** `mip update X` calls. `mip install X@<version>` always honors the explicit request regardless of what is currently installed.
 
 ### 7.2 Local Package Update
 

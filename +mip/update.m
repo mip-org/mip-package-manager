@@ -351,7 +351,18 @@ function [tf, latestInfo] = checkRemoteNeedsUpdate(p, force)
             displayFqn, installedVersion, channelStr);
 
     index = mip.channel.fetch_index(channelStr);
-    [packageInfoMap, unavailablePackages] = mip.resolve.build_package_info_map(index, p.org, p.channel);
+
+    % If the installed version is non-numeric (e.g. 'main', 'master',
+    % 'unspecified'), pin the update lookup to that version track.
+    % Otherwise the default select_best_version would silently switch to
+    % a higher-ranked numeric release the first time one appears in the
+    % channel. Switching tracks requires an explicit `mip install X@...`.
+    requestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
+    if ~isempty(installedVersion) && ~isNumericVersion(installedVersion)
+        requestedVersions(p.name) = installedVersion;
+    end
+    [packageInfoMap, unavailablePackages] = mip.resolve.build_package_info_map( ...
+        index, p.org, p.channel, requestedVersions);
 
     currentArch = mip.arch();
     if ~packageInfoMap.isKey(fqn)
@@ -523,7 +534,12 @@ function updateSelf(p, force)
     fprintf('Checking for updates to mip (installed: %s)...\n', installedVersion);
 
     index = mip.channel.fetch_index(channelStr);
-    [packageInfoMap, ~] = mip.resolve.build_package_info_map(index, 'mip-org', 'core');
+    requestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
+    if ~isempty(installedVersion) && ~isNumericVersion(installedVersion)
+        requestedVersions(p.name) = installedVersion;
+    end
+    [packageInfoMap, ~] = mip.resolve.build_package_info_map( ...
+        index, 'mip-org', 'core', requestedVersions);
 
     if ~packageInfoMap.isKey(fqn)
         error('mip:update:notInIndex', 'mip not found in the mip-org/core channel index.');
@@ -616,6 +632,19 @@ function out = resolvePathList(srcDir, relPaths)
             out{i} = srcDir;
         else
             out{i} = fullfile(srcDir, relPaths{i});
+        end
+    end
+end
+
+function tf = isNumericVersion(v)
+% True when v is a dot-separated sequence of numeric components (e.g.
+% '1', '0.5.0'). Mirrors the numeric-version test in select_best_version.
+    parts = strsplit(v, '.');
+    tf = true;
+    for k = 1:length(parts)
+        if isnan(str2double(parts{k}))
+            tf = false;
+            return
         end
     end
 end
