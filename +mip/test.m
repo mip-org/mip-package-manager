@@ -28,7 +28,7 @@ end
 
 % Load the package if not already loaded
 if ~mip.state.is_loaded(r.fqn)
-    fprintf('Loading package "%s"...\n', r.fqn);
+    fprintf('Loading package "%s"...\n', mip.parse.display_fqn(r.fqn));
     mip.load(r.fqn);
 end
 
@@ -37,7 +37,7 @@ pkgInfo = mip.config.read_package_json(r.pkg_dir);
 testScript = mip.config.get_build_field(pkgInfo, r.pkg_dir, 'test_script');
 
 if isempty(testScript)
-    fprintf('No test script defined for package "%s".\n', r.fqn);
+    fprintf('No test script defined for package "%s".\n', mip.parse.display_fqn(r.fqn));
     return
 end
 
@@ -55,7 +55,7 @@ if ~exist(scriptPath, 'file')
           'Test script not found: %s', scriptPath);
 end
 
-fprintf('Running test script for "%s": %s\n', r.fqn, testScript);
+fprintf('Running test script for "%s": %s\n', mip.parse.display_fqn(r.fqn), testScript);
 originalDir = pwd;
 try
     cd(testDir);
@@ -64,7 +64,7 @@ catch ME
     cd(originalDir);
     % Print the original error's stack so failures inside the test script
     % aren't hidden behind the mip:test:failed wrapper below.
-    fprintf(2, '\nError inside test script for "%s":\n', r.fqn);
+    fprintf(2, '\nError inside test script for "%s":\n', mip.parse.display_fqn(r.fqn));
     fprintf(2, '  %s\n', ME.message);
     if ~isempty(ME.identifier)
         fprintf(2, '  (identifier: %s)\n', ME.identifier);
@@ -84,7 +84,7 @@ catch ME
     end
     fprintf(2, '\n');
     error('mip:test:failed', ...
-          'Test failed for "%s": %s', r.fqn, ME.message);
+          'Test failed for "%s": %s', mip.parse.display_fqn(r.fqn), ME.message);
 end
 cd(originalDir);
 

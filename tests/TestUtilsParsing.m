@@ -48,9 +48,42 @@ classdef TestUtilsParsing < matlab.unittest.TestCase
             testCase.verifyTrue(r.is_fqn);
         end
 
-        function testParseInvalidTwoParts(testCase)
-            testCase.verifyError(@() mip.parse.parse_package_arg('a/b'), ...
-                'mip:invalidPackageSpec');
+        function testParseTwoPartAsNonChannelShorthand(testCase)
+            % 2-part input "category/name" parses to the internal FQN
+            % "_/category/name" (non-channel packages). This is how users
+            % enter packages like local/mypkg and fex/shadedErrorBar.
+            r = mip.parse.parse_package_arg('local/mypkg');
+            testCase.verifyEqual(r.org, '_');
+            testCase.verifyEqual(r.channel, 'local');
+            testCase.verifyEqual(r.name, 'mypkg');
+            testCase.verifyTrue(r.is_fqn);
+            testCase.verifyEqual(r.version, '');
+        end
+
+        function testParseTwoPartFexCategory(testCase)
+            r = mip.parse.parse_package_arg('fex/shadedErrorBar');
+            testCase.verifyEqual(r.org, '_');
+            testCase.verifyEqual(r.channel, 'fex');
+            testCase.verifyEqual(r.name, 'shadedErrorBar');
+            testCase.verifyTrue(r.is_fqn);
+        end
+
+        function testParseTwoPartWithVersion(testCase)
+            r = mip.parse.parse_package_arg('local/mypkg@1.2.0');
+            testCase.verifyEqual(r.org, '_');
+            testCase.verifyEqual(r.channel, 'local');
+            testCase.verifyEqual(r.name, 'mypkg');
+            testCase.verifyEqual(r.version, '1.2.0');
+        end
+
+        function testParseExplicitInternalFqn(testCase)
+            % Users may also type the full internal form; it parses the
+            % same as 3-part input.
+            r = mip.parse.parse_package_arg('_/local/mypkg');
+            testCase.verifyEqual(r.org, '_');
+            testCase.verifyEqual(r.channel, 'local');
+            testCase.verifyEqual(r.name, 'mypkg');
+            testCase.verifyTrue(r.is_fqn);
         end
 
         function testParseInvalidFourParts(testCase)
@@ -162,8 +195,34 @@ classdef TestUtilsParsing < matlab.unittest.TestCase
         end
 
         function testMakeFqnLocal(testCase)
-            fqn = mip.parse.make_fqn('local', 'local', 'testpkg');
-            testCase.verifyEqual(fqn, 'local/local/testpkg');
+            fqn = mip.parse.make_fqn('_', 'local', 'testpkg');
+            testCase.verifyEqual(fqn, '_/local/testpkg');
+        end
+
+        %% display_fqn tests
+
+        function testDisplayFqnChannel(testCase)
+            % Channel FQNs pass through unchanged.
+            testCase.verifyEqual(mip.parse.display_fqn('mip-org/core/chebfun'), ...
+                'mip-org/core/chebfun');
+            testCase.verifyEqual(mip.parse.display_fqn('mylab/custom/mypkg'), ...
+                'mylab/custom/mypkg');
+        end
+
+        function testDisplayFqnStripsUnderscorePrefix(testCase)
+            testCase.verifyEqual(mip.parse.display_fqn('_/local/mypkg'), ...
+                'local/mypkg');
+            testCase.verifyEqual(mip.parse.display_fqn('_/fex/shadedErrorBar'), ...
+                'fex/shadedErrorBar');
+        end
+
+        function testDisplayFqnRoundTrip(testCase)
+            % Display form, when re-parsed, resolves to the internal form.
+            internal = '_/local/mypkg';
+            display = mip.parse.display_fqn(internal);
+            r = mip.parse.parse_package_arg(display);
+            testCase.verifyEqual(mip.parse.make_fqn(r.org, r.channel, r.name), ...
+                internal);
         end
 
         function testMakeFqnRoundTrip(testCase)

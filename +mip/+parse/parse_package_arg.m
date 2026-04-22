@@ -27,6 +27,11 @@ function result = parse_package_arg(arg)
 %
 %   r = parse_package_arg('mip-org/core/mip@main')
 %     -> name='mip', org='mip-org', channel='core', is_fqn=true, version='main'
+%
+%   r = parse_package_arg('local/mypkg')
+%     -> name='mypkg', org='_', channel='local', is_fqn=true, version=''
+%       (2-part X/Y is shorthand for the internal FQN _/X/Y, used for
+%        non-channel packages such as local directory and FEX installs.)
 
 % Extract @version suffix if present
 atIdx = strfind(arg, '@');
@@ -45,6 +50,11 @@ if length(parts) == 1
     result.org = '';
     result.channel = '';
     result.is_fqn = false;
+elseif length(parts) == 2
+    result.org = '_';
+    result.channel = parts{1};
+    result.name = parts{2};
+    result.is_fqn = true;
 elseif length(parts) == 3
     result.org = parts{1};
     result.channel = parts{2};
@@ -52,7 +62,7 @@ elseif length(parts) == 3
     result.is_fqn = true;
 else
     error('mip:invalidPackageSpec', ...
-          'Invalid package spec "%s". Use "package[@version]" or "org/channel/package[@version]".', arg);
+          'Invalid package spec "%s". Use "package[@version]", "category/package[@version]", or "org/channel/package[@version]".', arg);
 end
 
 % Validate components: alphanumeric, hyphens, underscores, periods.

@@ -427,7 +427,7 @@ function installedFqns = installFromRepository(repoPackages, channel, markDirect
         if length(allInstalled) > 1
             fprintf('\nWarning: Package "%s" is installed from multiple channels:\n', s.name);
             for k = 1:length(allInstalled)
-                fprintf('  - %s\n', allInstalled{k});
+                fprintf('  - %s\n', mip.parse.display_fqn(allInstalled{k}));
             end
         end
     end
@@ -700,7 +700,7 @@ function installFromUrlFlag(args, zipUrl, editable, noCompile)
         fprintf('\n');
     end
 
-    mip.build.install_local(sourceDir, false, noCompile);
+    mip.build.install_local(sourceDir, false, noCompile, 'fex');
 
     % Clear source_path in the installed mip.json. `install_local` records
     % the extracted source dir, but that temp dir is deleted when this
@@ -711,7 +711,7 @@ function installFromUrlFlag(args, zipUrl, editable, noCompile)
 end
 
 function clearSourcePath(pkgName)
-    mipJsonPath = fullfile(mip.paths.get_package_dir('local', 'local', pkgName), 'mip.json');
+    mipJsonPath = fullfile(mip.paths.get_package_dir('_', 'fex', pkgName), 'mip.json');
     if ~isfile(mipJsonPath)
         return
     end

@@ -115,7 +115,7 @@ function update(varargin)
     for i = 1:length(resolved)
         p = resolved{i};
         if p.noSource
-            fprintf('Skipping "%s": no local source to update from.\n', p.fqn);
+            fprintf('Skipping "%s": no local source to update from.\n', mip.parse.display_fqn(p.fqn));
         else
             toProcess{end+1} = p; %#ok<AGROW>
         end
@@ -132,7 +132,7 @@ function update(varargin)
             if ~(p.isLocal && p.editable)
                 error('mip:update:noCompileRequiresEditable', ...
                       '--no-compile can only be used when all updated packages are editable local installs (offending package: "%s").', ...
-                      p.fqn);
+                      mip.parse.display_fqn(p.fqn));
             end
         end
     end
@@ -199,10 +199,10 @@ function update(varargin)
         % that a failure in install_local does not destroy the installed copy.
         for i = 1:length(localPkgs)
             p = localPkgs{i};
-            fprintf('Updating local package "%s"...\n', p.fqn);
+            fprintf('Updating local package "%s"...\n', mip.parse.display_fqn(p.fqn));
 
             if mip.state.is_loaded(p.fqn)
-                fprintf('Unloading "%s" before update...\n', p.fqn);
+                fprintf('Unloading "%s" before update...\n', mip.parse.display_fqn(p.fqn));
                 mip.unload(p.fqn);
             end
 
@@ -210,13 +210,12 @@ function update(varargin)
             backupDir = [tempname '_mip_backup'];
             movefile(p.pkgDir, backupDir);
             mip.state.remove_directly_installed(p.fqn);
-            packagesDir = mip.paths.get_packages_dir();
-            mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'local', 'local'));
-            mip.paths.cleanup_empty_dirs(fullfile(packagesDir, 'local'));
+            mip.paths.cleanup_empty_dirs(fileparts(p.pkgDir));
+            mip.paths.cleanup_empty_dirs(fileparts(fileparts(p.pkgDir)));
 
-            fprintf('Reinstalling "%s" from %s...\n', p.fqn, p.sourcePath);
+            fprintf('Reinstalling "%s" from %s...\n', mip.parse.display_fqn(p.fqn), p.sourcePath);
             try
-                mip.build.install_local(p.sourcePath, p.editable, noCompile);
+                mip.build.install_local(p.sourcePath, p.editable, noCompile, p.channel);
             catch ME
                 % Restore old package on failure
                 parentDir = fileparts(p.pkgDir);
@@ -234,7 +233,7 @@ function update(varargin)
             % Unpin if this was a forced update of a pinned package
             if force && mip.state.is_pinned(p.fqn)
                 mip.state.remove_pinned(p.fqn);
-                fprintf('Unpinned "%s".\n', p.fqn);
+                fprintf('Unpinned "%s".\n', mip.parse.display_fqn(p.fqn));
             end
         end
 
@@ -247,7 +246,7 @@ function update(varargin)
             for i = 1:length(remotePkgs)
                 p = remotePkgs{i};
                 if mip.state.is_loaded(p.fqn)
-                    fprintf('Unloading "%s" before update...\n', p.fqn);
+                    fprintf('Unloading "%s" before update...\n', mip.parse.display_fqn(p.fqn));
                     mip.unload(p.fqn);
                 end
                 downloadAndReplace(p);
@@ -255,7 +254,7 @@ function update(varargin)
                 % Unpin if this was a forced update of a pinned package
                 if force && mip.state.is_pinned(p.fqn)
                     mip.state.remove_pinned(p.fqn);
-                    fprintf('Unpinned "%s".\n', p.fqn);
+                    fprintf('Unpinned "%s".\n', mip.parse.display_fqn(p.fqn));
                 end
             end
 
@@ -298,7 +297,7 @@ function p = resolvePackage(packageArg)
         pkgInfo = struct('version', 'unknown', 'name', r.name);
     end
 
-    isLocal = strcmp(r.org, 'local') && strcmp(r.channel, 'local');
+    isLocal = strcmp(r.org, '_');
     sourcePath = '';
     editable = false;
     noSource = false;
@@ -313,7 +312,7 @@ function p = resolvePackage(packageArg)
         noSource = isempty(sourcePath);
         if ~noSource && ~isfolder(sourcePath)
             error('mip:update:sourceNotFound', ...
-                  'Source directory "%s" for package "%s" no longer exists.', sourcePath, r.fqn);
+                  'Source directory "%s" for package "%s" no longer exists.', sourcePath, mip.parse.display_fqn(r.fqn));
         end
         editable = isfield(pkgInfo, 'editable') && pkgInfo.editable;
     end
@@ -341,7 +340,7 @@ function [tf, latestInfo] = checkRemoteNeedsUpdate(p, force)
     channelStr = [p.org '/' p.channel];
 
     fprintf('Checking for updates to "%s" (installed: %s, channel: %s)...\n', ...
-            fqn, installedVersion, channelStr);
+            mip.parse.display_fqn(fqn), installedVersion, channelStr);
 
     index = mip.channel.fetch_index(channelStr);
     [packageInfoMap, unavailablePackages] = mip.resolve.build_package_info_map(index, p.org, p.channel);
@@ -363,18 +362,18 @@ function [tf, latestInfo] = checkRemoteNeedsUpdate(p, force)
     latestInfo = packageInfoMap(fqn);
 
     if force
-        fprintf('Force updating "%s" (%s)\n', fqn, installedVersion);
+        fprintf('Force updating "%s" (%s)\n', mip.parse.display_fqn(fqn), installedVersion);
         tf = true;
         return
     end
 
     if ~mip.state.check_needs_update(p.pkgInfo, latestInfo)
-        fprintf('Package "%s" is already up to date (%s)\n', fqn, installedVersion);
+        fprintf('Package "%s" is already up to date (%s)\n', mip.parse.display_fqn(fqn), installedVersion);
         tf = false;
         return
     end
 
-    fprintf('Updating "%s": %s -> %s\n', fqn, installedVersion, latestInfo.version);
+    fprintf('Updating "%s": %s -> %s\n', mip.parse.display_fqn(fqn), installedVersion, latestInfo.version);
     tf = true;
 end
 
@@ -383,7 +382,7 @@ function downloadAndReplace(p)
 % The old package is moved to a backup and restored if the swap fails,
 % so a failure at any point does not destroy the installed copy.
 
-    fprintf('Downloading %s %s...\n', p.fqn, p.latestInfo.version);
+    fprintf('Downloading %s %s...\n', mip.parse.display_fqn(p.fqn), p.latestInfo.version);
 
     tempDir = tempname;
     mkdir(tempDir);
@@ -406,7 +405,7 @@ function downloadAndReplace(p)
             rethrow(ME);
         end
         rmdir(backupDir, 's');
-        fprintf('Successfully updated "%s" to %s\n', p.fqn, p.latestInfo.version);
+        fprintf('Successfully updated "%s" to %s\n', mip.parse.display_fqn(p.fqn), p.latestInfo.version);
     catch ME
         if exist(tempDir, 'dir')
             rmdir(tempDir, 's');

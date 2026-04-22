@@ -71,7 +71,7 @@ classdef TestCompile < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.build.install_local(srcDir, true);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', '_', 'local', 'mypkg');
             testCase.verifyTrue(exist(pkgDir, 'dir') > 0);
         end
 
@@ -80,7 +80,7 @@ classdef TestCompile < matlab.unittest.TestCase
                 'compile_script', 'do_compile.m');
             mip.build.install_local(srcDir, true);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', '_', 'local', 'mypkg');
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyTrue(isfield(info, 'compile_script'), ...
                 'mip.json should store compile_script');
@@ -92,7 +92,7 @@ classdef TestCompile < matlab.unittest.TestCase
                 'compile_script', 'do_compile.m');
             mip.build.install_local(srcDir, true, true);
 
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', '_', 'local', 'mypkg');
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyTrue(isfield(info, 'compile_script'), ...
                 'mip.json should store compile_script even with --no-compile');
@@ -138,7 +138,7 @@ classdef TestCompile < matlab.unittest.TestCase
                 'compile_script', 'do_compile.m');
             mip.build.install_local(srcDir, true, true);
 
-            mip.compile('local/local/mypkg');
+            mip.compile('_/local/mypkg');
 
             testCase.verifyTrue(isfile(fullfile(srcDir, '.compiled')));
         end
@@ -167,7 +167,7 @@ classdef TestCompile < matlab.unittest.TestCase
             mip.build.install_local(srcDir, false);
 
             % Source lives under pkgDir/mypkg/ for non-editable installs
-            pkgDir = fullfile(testCase.TestRoot, 'packages', 'local', 'local', 'mypkg');
+            pkgDir = fullfile(testCase.TestRoot, 'packages', '_', 'local', 'mypkg');
             pkgSubdir = fullfile(pkgDir, 'mypkg');
 
             % prepare_package compiled during install; remove the marker

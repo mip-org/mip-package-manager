@@ -45,9 +45,16 @@ Channel strings can be specified as:
 
 A bare channel name (e.g., just `core`) is **invalid** and raises `mip:invalidChannel`.
 
-### 1.6 The `local/local` Channel
+### 1.6 Non-Channel Packages (the `_/` org)
 
-Packages installed from local directories (both editable and non-editable) are placed under the synthetic channel `local/local`. This is not a real GitHub-hosted channel; it exists only on the local filesystem.
+Packages that don't originate from a GitHub-hosted channel live under the reserved `_` org. The slot after `_` is a subchannel that identifies the install source:
+
+- `_/local/<pkg>` — installed from a local directory (editable or copy)
+- `_/fex/<pkg>` — installed from a MathWorks File Exchange URL (or a plain `.zip` URL)
+
+`_` is not a real GitHub org; this layout exists only on the local filesystem.
+
+**Display form.** User-facing output strips the leading `_/`, so users see `local/<pkg>` and `fex/<pkg>`. Users may type either form — `mip load local/mypkg` and `mip load _/local/mypkg` are equivalent — and a 2-part input `X/Y` is parsed as the internal FQN `_/X/Y` (see [§2.1](#21-parsing-a-package-argument-parse_package_arg)).
 
 ### 1.7 The `mip-org/core/mip` Identity
 
@@ -59,7 +66,7 @@ The package `mip-org/core/mip` is the package manager itself. It has special pro
 - It is never pruned during dependency pruning.
 - `mip uninstall mip-org/core/mip` triggers a full self-uninstall (see [§6.4](#64-self-uninstall-mip-uninstall-mip)) rather than an ordinary package removal.
 
-**Important**: These protections apply **only** to the exact FQN `mip-org/core/mip`. A package named `mip` on any other channel (e.g., `mylab/custom/mip`, `local/local/mip`) is treated as a normal package. The match is by name equivalence (see [§1.8](#18-name-equivalence)), so `mip-org/core/MIP`, `mip-org/core/Mip`, etc. all refer to the same protected identity.
+**Important**: These protections apply **only** to the exact FQN `mip-org/core/mip`. A package named `mip` on any other channel (e.g., `mylab/custom/mip`, `_/local/mip`) is treated as a normal package. The match is by name equivalence (see [§1.8](#18-name-equivalence)), so `mip-org/core/MIP`, `mip-org/core/Mip`, etc. all refer to the same protected identity.
 
 ### 1.8 Name Equivalence
 
@@ -101,8 +108,8 @@ Input is split on `/` after stripping any `@version` suffix:
 | Input format | Result |
 |---|---|
 | `name` | bare name: `is_fqn=false`, `org=''`, `channel=''` |
+| `category/name` (2 parts) | FQN: `is_fqn=true`, `org='_'`, `channel=category`, `name=name` — shorthand for non-channel packages |
 | `org/channel/name` | FQN: `is_fqn=true`, org/channel/name populated |
-| `a/b` (2 parts) | **Error** `mip:invalidPackageSpec` |
 | `a/b/c/d` (4+ parts) | **Error** `mip:invalidPackageSpec` |
 
 Validation rules:
@@ -296,7 +303,7 @@ This is the default when installing from a local directory without `-e`/`--edita
 6. Compute addpaths from `mip.yaml` relative to the source subdir.
 7. Run compile script if specified.
 8. Create `mip.json` with metadata, including the `paths` field (list of addpath entries, relative to the package source subdir). `mip.load` resolves these against the installed package dir at load time.
-9. Move staging directory to `<root>/packages/local/local/<name>/`.
+9. Move staging directory to `<root>/packages/_/local/<name>/`.
 10. Store `source_path` in `mip.json` (for `mip update`).
 11. Mark as directly installed.
 
@@ -304,7 +311,7 @@ This is the default when installing from a local directory without `-e`/`--edita
 
 1. Read `mip.yaml` from the source directory.
 2. Match build and compute addpaths relative to the source directory.
-3. Create a thin wrapper directory at `<root>/packages/local/local/<name>/`.
+3. Create a thin wrapper directory at `<root>/packages/_/local/<name>/`.
 4. Create `mip.json` with `editable: true`, `source_path`, and the `paths` field (addpath entries relative to the source dir). `mip.load` resolves these against `source_path` at load time.
 5. Store `compile_script` and `test_script` in `mip.json` if present.
 6. If a `compile_script` is defined, **compile by default** (unless `--no-compile`). Packages with no `compile_script` skip this step silently.
@@ -329,7 +336,7 @@ Note: local install does **not** auto-install dependencies. They must be pre-ins
 
 #### 3.2.5 Already-Installed Behavior (Local)
 
-If the package is already installed at `local/local/<name>`, prints a message and returns without error. Does not reinstall. Use `mip update` or `mip uninstall` first.
+If the package is already installed at `_/local/<name>`, prints a message and returns without error. Does not reinstall. Use `mip update` or `mip uninstall` first.
 
 ### 3.3 Installation from `.mhl` File
 

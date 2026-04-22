@@ -46,7 +46,7 @@ function uninstall(varargin)
             elseif length(allMatches) > 1
                 fprintf('Package name "%s" is ambiguous. It is installed in multiple channels:\n', result.name);
                 for k = 1:length(allMatches)
-                    fprintf('  %s\n', allMatches{k});
+                    fprintf('  %s\n', mip.parse.display_fqn(allMatches{k}));
                 end
                 fprintf('Please specify the fully qualified name to uninstall.\n');
                 continue
@@ -95,12 +95,12 @@ function uninstall(varargin)
         pkgDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
 
         try
-            fprintf('Uninstalling "%s"...\n', fqn);
+            fprintf('Uninstalling "%s"...\n', mip.parse.display_fqn(fqn));
             rmdir(pkgDir, 's');
-            fprintf('Uninstalled package "%s"\n', fqn);
+            fprintf('Uninstalled package "%s"\n', mip.parse.display_fqn(fqn));
         catch ME
             error('mip:uninstallFailed', ...
-                  'Failed to uninstall package "%s": %s', fqn, ME.message);
+                  'Failed to uninstall package "%s": %s', mip.parse.display_fqn(fqn), ME.message);
         end
 
         % Remove from directly installed and pinned packages

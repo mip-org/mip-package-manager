@@ -48,10 +48,12 @@ sticky = false(1, n);
 pinned = false(1, n);
 editable = false(1, n);
 
+displayFqns = cell(1, n);
 for i = 1:n
     fqn = allPackages{i};
     result = mip.parse.parse_package_arg(fqn);
     names{i} = result.name;
+    displayFqns{i} = mip.parse.display_fqn(fqn);
     pkgDir = mip.paths.get_package_dir(result.org, result.channel, result.name);
 
     versions{i} = 'unknown';
@@ -103,14 +105,14 @@ if isempty(loadedIdx)
     fprintf('No packages are currently loaded. Use "mip load <package>" to load one.\n\n');
 else
     fprintf('=== Loaded Packages ===\n');
-    print_packages(loadedIdx, names, allPackages, versions, direct, sticky, pinned, editable, editablePaths);
+    print_packages(loadedIdx, names, displayFqns, versions, direct, sticky, pinned, editable, editablePaths);
     fprintf('\n');
 end
 
 % Display not-loaded packages section
 if ~isempty(notLoadedIdx)
     fprintf('=== Other Installed Packages ===\n');
-    print_packages(notLoadedIdx, names, allPackages, versions, direct, sticky, pinned, editable, editablePaths);
+    print_packages(notLoadedIdx, names, displayFqns, versions, direct, sticky, pinned, editable, editablePaths);
 end
 
 end

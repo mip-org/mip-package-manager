@@ -126,9 +126,9 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
 
     % Check for circular dependencies
     if ismember(fqn, loadingStack)
-        cycle = strjoin([loadingStack, {fqn}], ' -> ');
+        cycleDisplay = cellfun(@mip.parse.display_fqn, [loadingStack, {fqn}], 'UniformOutput', false);
         error('mip:circularDependency', ...
-              'Circular dependency detected: %s', cycle);
+              'Circular dependency detected: %s', strjoin(cycleDisplay, ' -> '));
     end
 
     % Add to loading stack for circular dependency detection
@@ -140,9 +140,10 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
 
     % Check if package exists
     if ~mip.state.is_installed(fqn)
+        displayFqn = mip.parse.display_fqn(fqn);
         error('mip:packageNotFound', ...
               'Package "%s" is not installed. Run "mip install %s" first.', ...
-              fqn, fqn);
+              displayFqn, displayFqn);
     end
 
     % Check if package is already loaded
@@ -151,15 +152,15 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
         % loaded as a dependency, mark it as direct now
         if isDirect && ~mip.state.is_directly_loaded(fqn)
             mip.state.key_value_append('MIP_DIRECTLY_LOADED_PACKAGES', fqn);
-            fprintf('Package "%s" is already loaded (now marked as direct)\n', fqn);
+            fprintf('Package "%s" is already loaded (now marked as direct)\n', mip.parse.display_fqn(fqn));
         else
-            fprintf('Package "%s" is already loaded\n', fqn);
+            fprintf('Package "%s" is already loaded\n', mip.parse.display_fqn(fqn));
         end
         % If --sticky was specified, add to sticky packages
         if stickyPackage
             if ~mip.state.is_sticky(fqn)
                 mip.state.key_value_append('MIP_STICKY_PACKAGES', fqn);
-                fprintf('Package "%s" is now sticky\n', fqn);
+                fprintf('Package "%s" is now sticky\n', mip.parse.display_fqn(fqn));
             end
         end
         % Apply --addpath/--rmpath even when already loaded so the user
@@ -187,14 +188,14 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
 
     if ~isempty(deps)
         fprintf('Loading dependencies for "%s": %s\n', ...
-                fqn, strjoin(deps, ', '));
+                mip.parse.display_fqn(fqn), strjoin(deps, ', '));
         for i = 1:length(deps)
             dep = deps{i};
             depFqn = mip.resolve.resolve_dependency(dep);
             if ~mip.state.is_loaded(depFqn)
                 loadSingle(depFqn, installIfMissing, false, channel, false, loadingStack, {}, {});
             else
-                fprintf('  Dependency "%s" is already loaded\n', depFqn);
+                fprintf('  Dependency "%s" is already loaded\n', mip.parse.display_fqn(depFqn));
             end
         end
     end
@@ -215,7 +216,7 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
     if ~hasPathsField && ~hasLoadScript
         error('mip:loadNotFound', ...
               ['Package "%s" has no "paths" field in mip.json and no ' ...
-               'load_package.m file'], fqn);
+               'load_package.m file'], mip.parse.display_fqn(fqn));
     end
 
     % Execute the load_package.m file. If it errors, the package is NOT
@@ -232,13 +233,13 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
         catch ME
             loadErr = MException('mip:loadError', ...
                 'Error executing load_package.m for package "%s": %s', ...
-                fqn, ME.message);
+                mip.parse.display_fqn(fqn), ME.message);
             loadErr = addCause(loadErr, ME);
             throw(loadErr);
         end
         clear restoreDir;
     end
-    fprintf('Loaded package "%s"\n', fqn);
+    fprintf('Loaded package "%s"\n', mip.parse.display_fqn(fqn));
 
     % Apply --addpath / --rmpath after load_package.m has run.
     applyPathAdjustments(packageDir, addPathRels, rmPathRels);
@@ -254,7 +255,7 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
     % Mark package as sticky if requested
     if stickyPackage
         mip.state.key_value_append('MIP_STICKY_PACKAGES', fqn);
-        fprintf('Package "%s" is now sticky\n', fqn);
+        fprintf('Package "%s" is now sticky\n', mip.parse.display_fqn(fqn));
     end
 end
 

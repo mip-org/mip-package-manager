@@ -200,9 +200,9 @@ classdef TestInstallZipUrl < matlab.unittest.TestCase
             mip.install('fex_seb_test', '--url', fexUrl);
 
             installedDir = fullfile(testCase.TestRoot, 'packages', ...
-                                    'local', 'local', 'fex_seb_test');
+                                    '_', 'fex', 'fex_seb_test');
             testCase.verifyTrue(exist(installedDir, 'dir') > 0, ...
-                'FEX package should install under local/local/');
+                'FEX package should install under _/fex/');
 
             % The auto-generated mip.yaml's repository field should be
             % the resolved zip URL (UUID path), not the original FEX URL.

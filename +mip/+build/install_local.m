@@ -1,16 +1,25 @@
-function install_local(sourceDir, editable, noCompile)
+function install_local(sourceDir, editable, noCompile, subchannel)
 %INSTALL_LOCAL   Install a package from a local directory with mip.yaml.
 %
+% Non-channel packages live under the reserved '_' org. The subchannel
+% argument selects the sub-category ('local' for directory/editable
+% installs, 'fex' for MATLAB File Exchange installs, etc.). User-facing
+% output strips the '_/' prefix.
+%
 % Args:
-%   sourceDir - Path to the directory containing mip.yaml
-%   editable  - If true, create an editable install (no copy)
-%   noCompile - If true, skip compilation (editable installs only)
+%   sourceDir  - Path to the directory containing mip.yaml
+%   editable   - If true, create an editable install (no copy)
+%   noCompile  - If true, skip compilation (editable installs only)
+%   subchannel - Category under '_/' (default: 'local')
 
 if nargin < 2
     editable = false;
 end
 if nargin < 3
     noCompile = false;
+end
+if nargin < 4
+    subchannel = 'local';
 end
 
 % Resolve to absolute path
@@ -23,9 +32,10 @@ packageName = mipConfig.name;
 fprintf('Found package "%s" (version %s)\n', packageName, ...
         num2str(mipConfig.version));
 
-% Use local/local as the org/channel for local installs
-org = 'local';
-channelName = 'local';
+% Non-channel packages use '_' as the org slot; subchannel distinguishes
+% the install source (e.g. 'local' for directories, 'fex' for File Exchange).
+org = '_';
+channelName = subchannel;
 fqn = mip.parse.make_fqn(org, channelName, packageName);
 
 % Check if already installed. If an equivalent but differently-cased/
@@ -39,12 +49,14 @@ if ~isempty(existingName) && ~strcmp(existingName, packageName)
           ['Cannot install "%s": an equivalent package "%s" is already installed. ' ...
            'Package names are equivalent when they match after lowercasing and ' ...
            'treating "-" and "_" as the same character. Uninstall "%s" first.'], ...
-          fqn, existingFqn, existingFqn);
+          mip.parse.display_fqn(fqn), mip.parse.display_fqn(existingFqn), ...
+          mip.parse.display_fqn(existingFqn));
 end
 
 pkgDir = mip.paths.get_package_dir(org, channelName, packageName);
 if exist(pkgDir, 'dir')
-    fprintf('Package "%s" is already installed. Uninstall first to reinstall.\n', fqn);
+    fprintf('Package "%s" is already installed. Uninstall first to reinstall.\n', ...
+            mip.parse.display_fqn(fqn));
     return;
 end
 
@@ -75,7 +87,7 @@ end
 
 % Mark as directly installed
 mip.state.add_directly_installed(fqn);
-fprintf('Successfully installed "%s"\n', fqn);
+fprintf('Successfully installed "%s"\n', mip.parse.display_fqn(fqn));
 fprintf('\nTo use this package, run:\n');
 fprintf('  mip load %s\n', mip.resolve.get_shortest_name(fqn));
 
@@ -84,7 +96,7 @@ allInstalled = mip.resolve.find_all_installed_by_name(packageName);
 if length(allInstalled) > 1
     fprintf('\nWarning: Package "%s" is installed from multiple channels:\n', packageName);
     for i = 1:length(allInstalled)
-        fprintf('  - %s\n', allInstalled{i});
+        fprintf('  - %s\n', mip.parse.display_fqn(allInstalled{i}));
     end
 end
 
@@ -99,7 +111,7 @@ function installCopy(sourceDir, pkgDir, fqn)
     stagingDir = tempname;
 
     try
-        fprintf('Installing "%s"...\n', fqn);
+        fprintf('Installing "%s"...\n', mip.parse.display_fqn(fqn));
         mip.build.prepare_package(sourceDir, stagingDir);
 
         % Create parent directories if needed
@@ -144,7 +156,7 @@ function installEditable(sourceDir, mipConfig, pkgDir, fqn, noCompile)
 % Unlike installCopy, this does NOT strip MEX binaries or copy files.
 % It DOES compile by default (unless --no-compile is used).
 
-    fprintf('Installing "%s" in editable mode...\n', fqn);
+    fprintf('Installing "%s" in editable mode...\n', mip.parse.display_fqn(fqn));
 
     % Match build and resolve config to determine addpaths
     [buildEntry, effectiveArch] = mip.build.match_build(mipConfig);

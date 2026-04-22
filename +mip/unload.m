@@ -48,7 +48,7 @@ function unload(varargin)
 
         % Check if package is loaded
         if ~mip.state.is_loaded(fqn)
-            fprintf('Package "%s" is not currently loaded\n', fqn);
+            fprintf('Package "%s" is not currently loaded\n', mip.parse.display_fqn(fqn));
             continue
         end
 
@@ -62,7 +62,7 @@ function unload(varargin)
         % Remove from all load-state lists
         mip.state.set_unloaded(fqn);
 
-        fprintf('Unloaded package "%s"\n', fqn);
+        fprintf('Unloaded package "%s"\n', mip.parse.display_fqn(fqn));
     end
 
     % Prune packages that are no longer needed (once, after all unloads)
@@ -227,7 +227,7 @@ function sweepPathEntries(packageDir, fqn, pkgInfo)
     restoreWarn = onCleanup(@() warning(oldState));
     for k = 1:numel(toRemove)
         rmpath(toRemove{k});
-        fprintf('  swept residual path entry for "%s": %s\n', fqn, toRemove{k});
+        fprintf('  swept residual path entry for "%s": %s\n', mip.parse.display_fqn(fqn), toRemove{k});
     end
 end
 
@@ -263,7 +263,8 @@ function pruneUnusedPackages()
 
     % Prune each unnecessary package
     if ~isempty(packagesToPrune)
-        fprintf('Pruning unnecessary packages: %s\n', strjoin(packagesToPrune, ', '));
+        pruneDisplay = cellfun(@mip.parse.display_fqn, packagesToPrune, 'UniformOutput', false);
+        fprintf('Pruning unnecessary packages: %s\n', strjoin(pruneDisplay, ', '));
         for i = 1:length(packagesToPrune)
             pkg = packagesToPrune{i};
             r = mip.parse.parse_package_arg(pkg);
@@ -275,7 +276,7 @@ function pruneUnusedPackages()
 
             executeUnload(packageDir, pkg);
             mip.state.key_value_remove('MIP_LOADED_PACKAGES', pkg);
-            fprintf('  Pruned package "%s"\n', pkg);
+            fprintf('  Pruned package "%s"\n', mip.parse.display_fqn(pkg));
         end
     end
 
@@ -314,18 +315,20 @@ function unloadAll(forceUnload)
     if isempty(packagesToUnload)
         fprintf('No packages to unload\n');
         if ~forceUnload && ~isempty(MIP_STICKY_PACKAGES)
-            fprintf('Sticky packages remain: %s\n', strjoin(MIP_STICKY_PACKAGES, ', '));
+            stickyDisplay = cellfun(@mip.parse.display_fqn, MIP_STICKY_PACKAGES, 'UniformOutput', false);
+            fprintf('Sticky packages remain: %s\n', strjoin(stickyDisplay, ', '));
         end
         return
     end
 
+    unloadDisplay = cellfun(@mip.parse.display_fqn, packagesToUnload, 'UniformOutput', false);
     if forceUnload
-        fprintf('Unloading all packages: %s\n', strjoin(packagesToUnload, ', '));
+        fprintf('Unloading all packages: %s\n', strjoin(unloadDisplay, ', '));
     else
         if ~isempty(MIP_STICKY_PACKAGES)
-            fprintf('Unloading all non-sticky packages: %s\n', strjoin(packagesToUnload, ', '));
+            fprintf('Unloading all non-sticky packages: %s\n', strjoin(unloadDisplay, ', '));
         else
-            fprintf('Unloading all packages: %s\n', strjoin(packagesToUnload, ', '));
+            fprintf('Unloading all packages: %s\n', strjoin(unloadDisplay, ', '));
         end
     end
 
@@ -339,7 +342,7 @@ function unloadAll(forceUnload)
             packageDir = fullfile(mip.paths.get_packages_dir(), pkg);
         end
         executeUnload(packageDir, pkg);
-        fprintf('  Unloaded package "%s"\n', pkg);
+        fprintf('  Unloaded package "%s"\n', mip.parse.display_fqn(pkg));
     end
 
     % Update global variables (mip always remains)

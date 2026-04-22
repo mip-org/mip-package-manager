@@ -24,10 +24,10 @@ function unpin(varargin)
         end
 
         if ~mip.state.is_pinned(r.fqn)
-            fprintf('Package "%s" is not pinned.\n', r.fqn);
+            fprintf('Package "%s" is not pinned.\n', mip.parse.display_fqn(r.fqn));
         else
             mip.state.remove_pinned(r.fqn);
-            fprintf('Unpinned "%s".\n', r.fqn);
+            fprintf('Unpinned "%s".\n', mip.parse.display_fqn(r.fqn));
         end
     end
 end

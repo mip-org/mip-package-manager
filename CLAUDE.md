@@ -23,7 +23,7 @@ A package manager for MATLAB/MEX. Handles installing, updating, loading, and unl
 - **Bare name**: Just `package` — resolved via priority: `mip-org/core` first, then alphabetical
 - **Channels**: Package repositories hosted on GitHub Pages (e.g., `mip-org/mip-core`)
 - **Packages installed at**: `<root>/packages/<org>/<channel>/<package>/`
-- **Editable installs**: Thin wrapper at `local/local/<pkg>/` pointing to source directory
+- **Non-channel packages**: Installed under the reserved `_` org; subchannel identifies source (`_/local/<pkg>` for directory installs, `_/fex/<pkg>` for File Exchange/URL installs). User-facing output strips the `_/` prefix (users see and type `local/<pkg>` or `fex/<pkg>`; the internal 3-part form also works).
 - **Persistent state**: Uses `setappdata(0, key, value)` for loaded/sticky/directly-loaded package tracking; `directly_installed.txt` for install tracking
 
 ## Running Tests

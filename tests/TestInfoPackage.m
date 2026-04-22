@@ -132,7 +132,7 @@ classdef TestInfoPackage < matlab.unittest.TestCase
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.build.install_local(srcDir, true);
 
-            output = evalc('try; mip.info(''local/local/mypkg''); catch; end');
+            output = evalc('try; mip.info(''_/local/mypkg''); catch; end');
             testCase.verifyTrue(contains(output, 'Editable: Yes'), ...
                 'Info should show editable flag for editable installs');
             testCase.verifyTrue(contains(output, 'Source:'), ...

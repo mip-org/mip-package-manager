@@ -61,8 +61,8 @@ channelsToQuery = {[org '/' channelName]};
 for i = 1:length(installedFqns)
     r = mip.parse.parse_package_arg(installedFqns{i});
     ch = [r.org '/' r.channel];
-    % Skip local/local — no remote index for local installs
-    if strcmp(ch, 'local/local')
+    % Skip non-channel packages ('_/' prefix) — no remote index exists.
+    if strcmp(r.org, '_')
         continue
     end
     if ~ismember(ch, channelsToQuery)
@@ -124,7 +124,7 @@ function showLocalInstallInfo(fqn)
     r = mip.parse.parse_package_arg(fqn);
     pkgDir = mip.paths.get_package_dir(r.org, r.channel, r.name);
 
-    fprintf('\n  %s\n', fqn);
+    fprintf('\n  %s\n', mip.parse.display_fqn(fqn));
 
     try
         pkgInfo = mip.config.read_package_json(pkgDir);
