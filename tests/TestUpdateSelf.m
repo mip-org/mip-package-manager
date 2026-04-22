@@ -45,9 +45,9 @@ classdef TestUpdateSelf < matlab.unittest.TestCase
             % Seed a fake mip-org/core/mip in the test root so that
             % resolve_to_installed finds it and updateSelf has a target.
             % The marker version must be numeric so it doesn't trigger
-            % the non-numeric-track pinning in updateSelf (see
+            % the non-numeric-version pinning in updateSelf (see
             % specification §7.1.1) — this test exercises the force-swap
-            % mechanics, not the branch-track rule.
+            % mechanics, not the branch-or-version rule.
             pkgDir = createTestPackage(testCase.TestRoot, ...
                 'mip-org', 'core', 'mip', 'version', '0.0.0');
             info1 = mip.config.read_package_json(pkgDir);

@@ -1,10 +1,10 @@
-classdef TestUpdateBranchTrack < matlab.unittest.TestCase
-%TESTUPDATEBRANCHTRACK   Tests that `mip update` preserves non-numeric
-%version tracks (main/master/unspecified) rather than silently switching
-%to a newly published numeric release.
+classdef TestUpdateBranchOrVersion < matlab.unittest.TestCase
+%TESTUPDATEBRANCHORVERSION   Tests that `mip update` preserves non-numeric
+%branches or versions (main/master/unspecified) rather than silently
+%switching to a newly published numeric release.
 %
 %   Uses a synthetic channel cache (no network) to simulate a channel
-%   that has both a branch track ("main") and a numeric release.
+%   that has both a branch ("main") and a numeric release.
 
     properties
         OrigMipRoot
@@ -14,7 +14,7 @@ classdef TestUpdateBranchTrack < matlab.unittest.TestCase
     methods (TestMethodSetup)
         function setupTestEnvironment(testCase)
             testCase.OrigMipRoot = getenv('MIP_ROOT');
-            testCase.TestRoot = [tempname '_mip_branch_track_test'];
+            testCase.TestRoot = [tempname '_mip_branch_or_version_test'];
             mkdir(testCase.TestRoot);
             mkdir(fullfile(testCase.TestRoot, 'packages'));
             setenv('MIP_ROOT', testCase.TestRoot);
@@ -38,7 +38,7 @@ classdef TestUpdateBranchTrack < matlab.unittest.TestCase
         function testUpdate_StaysOnMain_WhenNumericExists(testCase)
             % Installed alpha@main with hash abc123. Channel has both
             % alpha@main (hash abc123) and alpha@0.5.0. `mip update`
-            % should pick the installed 'main' track, find no change,
+            % should pick the installed 'main' branch, find no change,
             % and report up-to-date — not switch to 0.5.0.
             fqn = 'mip-org/test-channel-bt/alpha';
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
@@ -46,7 +46,7 @@ classdef TestUpdateBranchTrack < matlab.unittest.TestCase
             writeInstalledPackage(pkgDir, 'alpha', 'main', 'abc123');
             mip.state.add_directly_installed(fqn);
 
-            writeSyntheticIndex(testCase.TestRoot, 'mip-org/test-channel-bt', { ...
+            writeChannelIndex(testCase.TestRoot, 'mip-org/test-channel-bt', { ...
                 makeIndexEntry('alpha', 'main',  'abc123'), ...
                 makeIndexEntry('alpha', '0.5.0', 'def456') ...
             });
@@ -69,7 +69,7 @@ classdef TestUpdateBranchTrack < matlab.unittest.TestCase
             writeInstalledPackage(pkgDir, 'beta', 'unspecified', 'abc123');
             mip.state.add_directly_installed(fqn);
 
-            writeSyntheticIndex(testCase.TestRoot, 'mip-org/test-channel-bt', { ...
+            writeChannelIndex(testCase.TestRoot, 'mip-org/test-channel-bt', { ...
                 makeIndexEntry('beta', 'unspecified', 'abc123'), ...
                 makeIndexEntry('beta', '1.0.0',       'def456') ...
             });
@@ -81,21 +81,22 @@ classdef TestUpdateBranchTrack < matlab.unittest.TestCase
         end
 
         function testUpdate_MainMissingFromChannel_Errors(testCase)
-            % If the installed branch track no longer exists in the
+            % If the installed branch or version no longer exists in the
             % channel, `mip update` should not silently fall through to
             % a numeric version — it should surface an error so the
-            % user can decide whether to switch tracks explicitly.
+            % user can decide whether to switch to a different branch or
+            % version explicitly.
             fqn = 'mip-org/test-channel-bt/gamma';
             pkgDir = fullfile(testCase.TestRoot, 'packages', ...
                 'mip-org', 'test-channel-bt', 'gamma');
             writeInstalledPackage(pkgDir, 'gamma', 'main', 'abc123');
             mip.state.add_directly_installed(fqn);
 
-            writeSyntheticIndex(testCase.TestRoot, 'mip-org/test-channel-bt', { ...
+            writeChannelIndex(testCase.TestRoot, 'mip-org/test-channel-bt', { ...
                 makeIndexEntry('gamma', '1.0.0', 'def456') ...
             });
 
-            testCase.verifyError(@() mip.update(fqn), 'mip:versionNotFound');
+            testCase.verifyError(@() mip.update(fqn), 'mip:update:versionNotInChannel');
 
             info = mip.config.read_package_json(pkgDir);
             testCase.verifyEqual(info.version, 'main', ...
@@ -112,7 +113,7 @@ classdef TestUpdateBranchTrack < matlab.unittest.TestCase
             writeInstalledPackage(pkgDir, 'delta', '1.0.0', 'aaa');
             mip.state.add_directly_installed(fqn);
 
-            writeSyntheticIndex(testCase.TestRoot, 'mip-org/test-channel-bt', { ...
+            writeChannelIndex(testCase.TestRoot, 'mip-org/test-channel-bt', { ...
                 makeIndexEntry('delta', '1.0.0', 'aaa'), ...
                 makeIndexEntry('delta', '2.0.0', 'bbb'), ...
                 makeIndexEntry('delta', 'main',  'ccc') ...
@@ -146,27 +147,6 @@ end
 function entry = makeIndexEntry(name, version, commitHash)
     entry = struct( ...
         'name', name, ...
-        'architecture', 'any', ...
         'version', version, ...
-        'commit_hash', commitHash, ...
-        'mhl_url', 'https://example.invalid/sentinel.mhl', ...
-        'dependencies', {{}});
-end
-
-function cacheFile = writeSyntheticIndex(rootDir, channel, entries)
-% Write a fresh-mtime channel index cache with explicit per-entry data.
-    parts = strsplit(channel, '/');
-    org = parts{1};
-    chName = parts{2};
-
-    cacheDir = fullfile(rootDir, 'cache', 'index', org);
-    if ~isfolder(cacheDir)
-        mkdir(cacheDir);
-    end
-    cacheFile = fullfile(cacheDir, [chName '.json']);
-
-    indexStruct = struct('packages', {entries});
-    fid = fopen(cacheFile, 'w');
-    fwrite(fid, jsonencode(indexStruct), 'char');
-    fclose(fid);
+        'commit_hash', commitHash);
 end

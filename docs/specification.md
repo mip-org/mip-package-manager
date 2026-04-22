@@ -662,11 +662,11 @@ Packages can be **pinned** to protect them from `mip update --all`; see [§7.11]
 
 #### 7.1.1 Target Version Selection for Update
 
-`mip update` does **not** always pick the channel's best version as the update target. If the installed version is **non-numeric** (e.g., `main`, `master`, `unspecified`), the update stays on that version track — the target is the same version in the channel, and only the commit hash is refreshed. This preserves the user's deliberate choice to track a branch and prevents `mip update` from silently switching to a numeric release that appears alongside the branch.
+`mip update` does **not** always pick the channel's best version as the update target. If the installed version is **non-numeric** (e.g., `main`, `master`, `unspecified`), the update stays on that branch or version — the target is the same version in the channel, and only the commit hash is refreshed. This preserves the user's deliberate choice to follow a branch and prevents `mip update` from silently switching to a numeric release that appears alongside it.
 
 Behavior by installed version:
 
-- **Non-numeric installed version** (e.g., `main`): target = same non-numeric version in the channel. If that version no longer exists in the channel, `mip:versionNotFound` is raised and the installed package is left untouched. To switch tracks, the user must explicitly `mip install X@<version>`.
+- **Non-numeric installed version** (e.g., `main`): target = same non-numeric version in the channel. If that version no longer exists in the channel, `mip:update:versionNotInChannel` is raised (with guidance pointing at `mip install X@<version>`) and the installed package is left untouched.
 - **Numeric installed version** (e.g., `1.0.0`): target = channel's best version per [§3.1.3](#313-version-selection-select_best_version) (typically the highest numeric version).
 
 This rule only governs **implicit** `mip update X` calls. `mip install X@<version>` always honors the explicit request regardless of what is currently installed.
@@ -1069,6 +1069,7 @@ Channel index downloads are cached on disk under `<root>/cache/index/<org>/<chan
 | `mip:packageNotFound` | Package not found (not installed, or not in index) |
 | `mip:packageUnavailable` | Package exists but not for this architecture |
 | `mip:versionNotFound` | Requested `@version` doesn't exist in the index |
+| `mip:update:versionNotInChannel` | `mip update` target: installed non-numeric branch or version is no longer in the channel |
 | `mip:circularDependency` | Circular dependency detected |
 | `mip:dependencyNotFound` | A dependency is not installed |
 | `mip:cannotUnloadMip` | Attempt to unload `mip-org/core/mip` |

@@ -353,16 +353,27 @@ function [tf, latestInfo] = checkRemoteNeedsUpdate(p, force)
     index = mip.channel.fetch_index(channelStr);
 
     % If the installed version is non-numeric (e.g. 'main', 'master',
-    % 'unspecified'), pin the update lookup to that version track.
+    % 'unspecified'), pin the update lookup to that branch or version.
     % Otherwise the default select_best_version would silently switch to
     % a higher-ranked numeric release the first time one appears in the
-    % channel. Switching tracks requires an explicit `mip install X@...`.
+    % channel. Switching to a different branch or version requires an
+    % explicit `mip install X@...`.
     requestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
-    if ~isempty(installedVersion) && ~isNumericVersion(installedVersion)
+    if ~isempty(installedVersion) && ~mip.resolve.is_numeric_version(installedVersion)
         requestedVersions(p.name) = installedVersion;
     end
-    [packageInfoMap, unavailablePackages] = mip.resolve.build_package_info_map( ...
-        index, p.org, p.channel, requestedVersions);
+    try
+        [packageInfoMap, unavailablePackages] = mip.resolve.build_package_info_map( ...
+            index, p.org, p.channel, requestedVersions);
+    catch err
+        if strcmp(err.identifier, 'mip:versionNotFound')
+            error('mip:update:versionNotInChannel', ...
+                  ['Installed version "%s" of "%s" no longer exists in channel "%s". ' ...
+                   'To switch to a different branch or version, run: mip install %s@<version>'], ...
+                  installedVersion, fqn, channelStr, fqn);
+        end
+        rethrow(err);
+    end
 
     currentArch = mip.arch();
     if ~packageInfoMap.isKey(fqn)
@@ -535,11 +546,21 @@ function updateSelf(p, force)
 
     index = mip.channel.fetch_index(channelStr);
     requestedVersions = containers.Map('KeyType', 'char', 'ValueType', 'any');
-    if ~isempty(installedVersion) && ~isNumericVersion(installedVersion)
+    if ~isempty(installedVersion) && ~mip.resolve.is_numeric_version(installedVersion)
         requestedVersions(p.name) = installedVersion;
     end
-    [packageInfoMap, ~] = mip.resolve.build_package_info_map( ...
-        index, 'mip-org', 'core', requestedVersions);
+    try
+        [packageInfoMap, ~] = mip.resolve.build_package_info_map( ...
+            index, 'mip-org', 'core', requestedVersions);
+    catch err
+        if strcmp(err.identifier, 'mip:versionNotFound')
+            error('mip:update:versionNotInChannel', ...
+                  ['Installed mip version "%s" no longer exists in mip-org/core. ' ...
+                   'To switch to a different branch or version, run: mip install mip@<version>'], ...
+                  installedVersion);
+        end
+        rethrow(err);
+    end
 
     if ~packageInfoMap.isKey(fqn)
         error('mip:update:notInIndex', 'mip not found in the mip-org/core channel index.');
@@ -632,19 +653,6 @@ function out = resolvePathList(srcDir, relPaths)
             out{i} = srcDir;
         else
             out{i} = fullfile(srcDir, relPaths{i});
-        end
-    end
-end
-
-function tf = isNumericVersion(v)
-% True when v is a dot-separated sequence of numeric components (e.g.
-% '1', '0.5.0'). Mirrors the numeric-version test in select_best_version.
-    parts = strsplit(v, '.');
-    tf = true;
-    for k = 1:length(parts)
-        if isnan(str2double(parts{k}))
-            tf = false;
-            return
         end
     end
 end
