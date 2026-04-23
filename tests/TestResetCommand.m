@@ -64,12 +64,13 @@ classdef TestResetCommand < matlab.unittest.TestCase
 
         function testReset_RemovesFromPath(testCase)
             pkgDir = createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'pkgA');
+            srcDir = fullfile(pkgDir, 'pkgA');
             mip.load('mip-org/core/pkgA');
-            testCase.verifyTrue(ismember(pkgDir, strsplit(path, pathsep)));
+            testCase.verifyTrue(ismember(srcDir, strsplit(path, pathsep)));
 
             mip.reset();
 
-            testCase.verifyFalse(ismember(pkgDir, strsplit(path, pathsep)));
+            testCase.verifyFalse(ismember(srcDir, strsplit(path, pathsep)));
         end
 
     end

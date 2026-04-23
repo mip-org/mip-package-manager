@@ -123,10 +123,6 @@ classdef TestBundleCommand < matlab.unittest.TestCase
 
             testCase.verifyTrue(exist(fullfile(extractDir, 'mip.json'), 'file') > 0);
             testCase.verifyTrue(exist(fullfile(extractDir, 'mypkg'), 'dir') > 0);
-            % Bundles no longer emit load_package.m / unload_package.m;
-            % the install path list lives in mip.json.
-            testCase.verifyFalse(exist(fullfile(extractDir, 'load_package.m'), 'file') > 0);
-            testCase.verifyFalse(exist(fullfile(extractDir, 'unload_package.m'), 'file') > 0);
         end
 
         function testBundle_MipJsonContainsPaths(testCase)

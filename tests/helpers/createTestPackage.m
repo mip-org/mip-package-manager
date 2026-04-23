@@ -9,6 +9,9 @@ function pkgDir = createTestPackage(rootDir, org, channel, pkgName, varargin)
 %     is the package name, with org/channel omitted or passed as ''.
 %     Pass source-type via the 'type' name-value ('local' or 'fex').
 %
+% The package is created with a "paths" field in mip.json that points at
+% the pkgDir/<name>/ source subdirectory.
+%
 % Args:
 %   rootDir  - The MIP_ROOT directory (e.g. tempdir)
 %   org      - Organization name (e.g. 'mip-org'). Use '' for non-gh.
@@ -18,26 +21,13 @@ function pkgDir = createTestPackage(rootDir, org, channel, pkgName, varargin)
 % Optional name-value pairs:
 %   'version'      - Version string (default: '1.0.0')
 %   'dependencies' - Cell array of dependency names (default: {})
-%   'sourceSubdir' - If true, create a pkgDir/<pkgName>/ source subdir
-%                    (matches mip's real non-editable install layout) and
-%                    have load/unload_package.m target that subdir. Required
-%                    for tests that exercise mip.paths.get_source_dir.
-%                    Default: false (source lives at pkgDir top level).
 %   'subdirs'      - Cell array of source-relative subdirs to mkdir under
-%                    the effective source directory (default: {}).
-%   'style'        - Controls which load/unload mechanism is emitted:
-%                      'legacy' - only load_package.m / unload_package.m
-%                      'new'    - only "paths" field in mip.json (no scripts)
-%                      'both'   - both (default). For sourceSubdir=false the
-%                                 flat layout has no realistic source dir, so
-%                                 'both' falls back to legacy-only.
+%                    the source directory (default: {}).
 
 p = inputParser;
 addParameter(p, 'version', '1.0.0', @ischar);
 addParameter(p, 'dependencies', {}, @iscell);
-addParameter(p, 'sourceSubdir', false, @islogical);
 addParameter(p, 'subdirs', {}, @iscell);
-addParameter(p, 'style', 'both', @(s) ischar(s) && ismember(s, {'legacy', 'new', 'both'}));
 addParameter(p, 'type', '', @ischar);
 parse(p, varargin{:});
 
@@ -61,36 +51,21 @@ if strcmp(sourceType, 'gh')
 else
     pkgDir = fullfile(rootDir, 'packages', sourceType, pkgName);
 end
-style = p.Results.style;
-useSourceSubdir = p.Results.sourceSubdir;
 
-% Create directory tree
 if ~exist(pkgDir, 'dir')
     mkdir(pkgDir);
 end
 
-if useSourceSubdir
-    sourceDir = fullfile(pkgDir, pkgName);
-    if ~exist(sourceDir, 'dir')
-        mkdir(sourceDir);
-    end
-else
-    sourceDir = pkgDir;
+sourceDir = fullfile(pkgDir, pkgName);
+if ~exist(sourceDir, 'dir')
+    mkdir(sourceDir);
 end
 
 for i = 1:numel(p.Results.subdirs)
     mkdir(fullfile(sourceDir, p.Results.subdirs{i}));
 end
 
-% The "paths" field in mip.json only makes sense when the package has a
-% real source subdir that mip.paths.get_source_dir can return. Flat test
-% layouts (sourceSubdir=false) don't, so 'both' and 'new' fall back to
-% legacy-only there. Callers that need the new-style behavior on a flat
-% layout should pass sourceSubdir=true.
-emitPathsField = useSourceSubdir && ismember(style, {'new', 'both'});
-emitLegacyScripts = ~useSourceSubdir || ismember(style, {'legacy', 'both'});
-
-% Create mip.json
+% Create mip.json with a "paths" field pointing at the source subdir.
 mipData = struct();
 mipData.name = pkgName;
 mipData.version = p.Results.version;
@@ -105,41 +80,10 @@ else
     mipData.dependencies = deps;
 end
 
-if emitPathsField
-    mipData.paths = {'.'};
-end
+mipData.paths = {'.'};
 
 fid = fopen(fullfile(pkgDir, 'mip.json'), 'w');
 fwrite(fid, jsonencode(mipData));
-fclose(fid);
-
-if ~emitLegacyScripts
-    return
-end
-
-% Build load/unload scripts. When sourceSubdir is set, target pkgDir/<name>/;
-% otherwise target pkgDir itself.
-if useSourceSubdir
-    targetExpr = sprintf('fullfile(pkg_dir, ''%s'')', pkgName);
-else
-    targetExpr = 'pkg_dir';
-end
-
-fid = fopen(fullfile(pkgDir, 'load_package.m'), 'w');
-fprintf(fid, 'function load_package()\n');
-fprintf(fid, '    pkg_dir = fileparts(mfilename(''fullpath''));\n');
-fprintf(fid, '    addpath(%s);\n', targetExpr);
-fprintf(fid, 'end\n');
-fclose(fid);
-
-fid = fopen(fullfile(pkgDir, 'unload_package.m'), 'w');
-fprintf(fid, 'function unload_package()\n');
-fprintf(fid, '    pkg_dir = fileparts(mfilename(''fullpath''));\n');
-fprintf(fid, '    target = %s;\n', targetExpr);
-fprintf(fid, '    if ismember(target, strsplit(path, pathsep))\n');
-fprintf(fid, '        rmpath(target);\n');
-fprintf(fid, '    end\n');
-fprintf(fid, 'end\n');
 fclose(fid);
 
 end

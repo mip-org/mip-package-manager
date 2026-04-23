@@ -19,11 +19,12 @@ function load(varargin)
 %   --install       Automatically install the package(s) if not already installed
 %   --channel <c>   Channel to install from when using --install
 %   --addpath <rel> Add this source-relative subpath to the MATLAB path AFTER
-%                   load_package.m runs. May be repeated. Only valid with a
-%                   single positional package; applies only to direct loads
-%                   (not transitive dependencies).
+%                   the paths from mip.json are added. May be repeated. Only
+%                   valid with a single positional package; applies only to
+%                   direct loads (not transitive dependencies).
 %   --rmpath  <rel> Remove this source-relative subpath from the MATLAB path
-%                   AFTER load_package.m runs. Same constraints as --addpath.
+%                   AFTER the paths from mip.json are added. Same constraints
+%                   as --addpath.
 %   --transitive    (internal) Load as a transitive dependency, not a direct load
 
     % Parse flags and package names from arguments
@@ -98,8 +99,8 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
 % Load a single package (and its dependencies recursively).
 %
 % addPathRels / rmPathRels: cell arrays of source-relative paths to
-% addpath / rmpath after load_package.m runs. Only honored for direct
-% loads (the recursive call for dependencies passes empty).
+% addpath / rmpath after the mip.json paths are applied. Only honored
+% for direct loads (the recursive call for dependencies passes empty).
 
     % Resolve the FQN for this package, installing first if requested
     try
@@ -201,48 +202,16 @@ function loadSingle(packageArg, installIfMissing, stickyPackage, channel, isDire
         end
     end
 
-    % Add paths from mip.json (new-style packages). Legacy packages that
-    % predate the paths field omit it entirely; they rely on
-    % load_package.m below instead.
-    hasPathsField = ~isempty(mipConfig) && isfield(mipConfig, 'paths');
-    if hasPathsField
-        applyMipJsonPaths(packageDir, mipConfig);
-    end
-
-    % Look for load_package.m file (legacy support; also allowed alongside
-    % the paths field for packages that need custom init logic).
-    loadFile = fullfile(packageDir, 'load_package.m');
-    hasLoadScript = exist(loadFile, 'file') ~= 0;
-
-    if ~hasPathsField && ~hasLoadScript
+    % Add paths from mip.json.
+    if isempty(mipConfig) || ~isfield(mipConfig, 'paths')
         error('mip:loadNotFound', ...
-              ['Package "%s" has no "paths" field in mip.json and no ' ...
-               'load_package.m file'], displayFqn);
+              'Package "%s" has no "paths" field in mip.json', displayFqn);
     end
+    applyMipJsonPaths(packageDir, mipConfig);
 
-    % Execute the load_package.m file. If it errors, the package is NOT
-    % marked as loaded, so the user can fix the issue and retry. We do not
-    % attempt to roll back any path or state changes that load_package.m
-    % (or the paths field above) may have made before failing -- doing so
-    % reliably is not possible.
-    if hasLoadScript
-        originalDir = pwd;
-        restoreDir = onCleanup(@() cd(originalDir));
-        cd(packageDir);
-        try
-            run(loadFile);
-        catch ME
-            loadErr = MException('mip:loadError', ...
-                'Error executing load_package.m for package "%s": %s', ...
-                displayFqn, ME.message);
-            loadErr = addCause(loadErr, ME);
-            throw(loadErr);
-        end
-        clear restoreDir;
-    end
     fprintf('Loaded package "%s"\n', displayFqn);
 
-    % Apply --addpath / --rmpath after load_package.m has run.
+    % Apply --addpath / --rmpath after the mip.json paths have been added.
     applyPathAdjustments(packageDir, addPathRels, rmPathRels);
 
     % Mark package as loaded
