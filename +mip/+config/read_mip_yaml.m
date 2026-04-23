@@ -34,7 +34,7 @@ if ~isfield(mipConfig, 'name')
           'mip.yaml is missing required "name" field');
 end
 
-if ~isfield(mipConfig, 'version')
+if ~isfield(mipConfig, 'version') || isempty(mipConfig.version)
     mipConfig.version = 'unknown';
 end
 

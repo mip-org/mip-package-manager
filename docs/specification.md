@@ -856,7 +856,7 @@ Behavior:
 1. If the target directory already contains a `mip.yaml`, `mip init` prints a message and exits without modifying anything.
 2. `addpaths` is auto-populated by walking the directory and identifying folders that contain runtime MATLAB code. The walk happens **before** the placeholder test script is created, so the root is not auto-included just because of that new file.
 3. A blank `test_<name>.m` is created at the target root (unless one already exists), and the generated `mip.yaml`'s `test_script` field points at it.
-4. Other optional string fields (`description`, `version`, `license`, `homepage`) are emitted blank for the user to fill in. `version` defaults to `"unknown"`. A single `builds: [{ architectures: [any] }]` entry is emitted.
+4. Other optional string fields (`description`, `version`, `license`, `homepage`) are emitted blank for the user to fill in. An empty `version` is normalized to `"unknown"` when read back via `mip.config.read_mip_yaml`. A single `builds: [{ architectures: [any] }]` entry is emitted.
 
 `mip init` also runs automatically on behalf of local installs that are missing a `mip.yaml` (after the user confirms the prompt -- see [§3.2](#32-local-installation)) and on URL-based installs that land on a source tree with no `mip.yaml` (see [§3.4](#34-installation-from-a-remote-zip-url)).
 
@@ -968,7 +968,7 @@ The `paths` field is the authoritative list of directories that `mip load` adds 
 
 ```yaml
 name: package_name              # Required
-version: "1.0.0"                # Optional (defaults to "unknown")
+version: "1.0.0"                # Optional; blank or numeric. Empty/missing is normalized to "unknown" internally.
 description: "..."              # Optional
 license: MIT                    # Optional
 homepage: "https://..."         # Optional
@@ -982,6 +982,18 @@ builds:                         # Optional
     compile_script: "compile.m" # Optional
     test_script: "run_tests.m"  # Optional
 ```
+
+#### 11.2.1 Channel Version Rules
+
+A channel's package layout is `packages/<name>/<version>/` where the directory name is the authoritative version. `recipe.yaml` does not carry a `version` field. `mip.yaml`'s `version` is optional; when present it must be either blank or numeric (e.g. `1.2.3`). Non-numeric values like branch names belong in the release directory name, not in `mip.yaml`.
+
+The channel build (`prepare_packages.py`) validates that the release-directory name is one of:
+
+1. the numeric `version` in `mip.yaml`,
+2. the `source.branch` in `recipe.yaml`, or
+3. any string, when `mip.yaml`'s `version` is blank/missing.
+
+When `mip.yaml`'s version is blank/missing, the channel build writes the release-directory name into `mip.yaml` before bundling, so the resulting `.mhl`'s `mip.json` carries the correct version string.
 
 ### 11.3 `.mhl` File Format
 
