@@ -44,7 +44,7 @@ try
         pkgInfo.dependencies = {pkgInfo.dependencies};
     end
 
-    % Normalize paths field IF present. The field is left absent when the
+    % Normalize paths field if present. The field is left absent when the
     % package has no "paths" entry in mip.json; callers treat that as a
     % malformed package and fail.
     if isfield(pkgInfo, 'paths')
