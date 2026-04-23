@@ -75,8 +75,8 @@ classdef TestInstallExtraPaths < matlab.unittest.TestCase
             info = mip.config.read_package_json(pkgDir);
             resolved = info.extra_paths.examples;
             testCase.verifyTrue(ismember('examples', resolved));
-            testCase.verifyTrue(ismember('examples/advanced', resolved));
-            testCase.verifyTrue(ismember('examples/utils', resolved));
+            testCase.verifyTrue(ismember(fullfile('examples', 'advanced'), resolved));
+            testCase.verifyTrue(ismember(fullfile('examples', 'utils'), resolved));
         end
 
         function testExtraPaths_RecursiveWithExclude_SkipsNamedDirs(testCase)
@@ -97,10 +97,10 @@ classdef TestInstallExtraPaths < matlab.unittest.TestCase
             info = mip.config.read_package_json(pkgDir);
             resolved = info.extra_paths.examples;
             testCase.verifyTrue(ismember('examples', resolved));
-            testCase.verifyTrue(ismember('examples/keep', resolved));
-            testCase.verifyFalse(ismember('examples/internal', resolved), ...
+            testCase.verifyTrue(ismember(fullfile('examples', 'keep'), resolved));
+            testCase.verifyFalse(ismember(fullfile('examples', 'internal'), resolved), ...
                 'excluded dir should not appear in resolved list');
-            testCase.verifyFalse(ismember('examples/internal/nested', resolved), ...
+            testCase.verifyFalse(ismember(fullfile('examples', 'internal', 'nested'), resolved), ...
                 'dirs beneath an excluded dir should not appear either');
         end
 
