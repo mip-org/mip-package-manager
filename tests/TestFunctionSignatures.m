@@ -107,6 +107,57 @@ classdef TestFunctionSignatures < matlab.unittest.TestCase
             testCase.verifyTrue(contains(second, '''newpkg'''));
         end
 
+        function testMipItselfExcludedFromLoadAndUnloadChoices(testCase)
+            % gh/mip-org/core/mip is always loaded+sticky, so offering
+            % it as a load/unload target would only be a no-op.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'mip');
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
+            mip.state.key_value_append('MIP_LOADED_PACKAGES', 'gh/mip-org/core/mip');
+            mip.state.key_value_append('MIP_LOADED_PACKAGES', 'gh/mip-org/core/alpha');
+
+            mip.state.update_function_signatures(testCase.ResourcesDir);
+
+            content = readJson(testCase.ResourcesDir);
+            loadSig   = extractSignature(content, 'load');
+            unloadSig = extractSignature(content, 'unload');
+
+            testCase.verifyFalse(contains(loadSig, '''mip'''), ...
+                'load choices must exclude mip itself');
+            testCase.verifyFalse(contains(unloadSig, '''mip'''), ...
+                'unload choices must exclude mip itself');
+            testCase.verifyTrue(contains(loadSig, '''alpha'''));
+            testCase.verifyTrue(contains(unloadSig, '''alpha'''));
+        end
+
+        function testOtherChannelMipStillAppearsInLoadChoices(testCase)
+            % Only gh/mip-org/core/mip is excluded; a package named 'mip'
+            % on a different channel must still appear.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'mip');
+            createTestPackage(testCase.TestRoot, 'other', 'channel', 'mip');
+
+            mip.state.update_function_signatures(testCase.ResourcesDir);
+
+            content = readJson(testCase.ResourcesDir);
+            loadSig = extractSignature(content, 'load');
+            testCase.verifyTrue(contains(loadSig, '''mip'''), ...
+                'mip from a non-core channel should still appear in load choices');
+        end
+
+        function testMipItselfIncludedInUninstallAndUpdateChoices(testCase)
+            % `mip uninstall mip` and `mip update mip` are valid, so mip
+            % should still appear in those completion choices.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'mip');
+
+            mip.state.update_function_signatures(testCase.ResourcesDir);
+
+            content = readJson(testCase.ResourcesDir);
+            uninstallSig = extractSignature(content, 'uninstall');
+            updateSig    = extractSignature(content, 'update');
+
+            testCase.verifyTrue(contains(uninstallSig, '''mip'''));
+            testCase.verifyTrue(contains(updateSig, '''mip'''));
+        end
+
         function testDuplicateBareNamesAreDeduplicated(testCase)
             % Same bare name on two different channels should appear once
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'pkg');

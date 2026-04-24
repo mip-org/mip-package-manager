@@ -31,11 +31,19 @@ function update_function_signatures(targetResourcesDir)
         end
     end
 
-    installed = bare_names(mip.state.list_installed_packages());
-    loaded    = bare_names(mip.state.key_value_get('MIP_LOADED_PACKAGES'));
-    pinned    = bare_names(mip.state.get_pinned());
+    mipFqn = 'gh/mip-org/core/mip';
+    installedFqns = mip.state.list_installed_packages();
+    loadedFqns    = mip.state.key_value_get('MIP_LOADED_PACKAGES');
 
-    json = build_signatures(installed, loaded, pinned);
+    installed = bare_names(installedFqns);
+    pinned    = bare_names(mip.state.get_pinned());
+    % For load/unload, exclude mip itself: it's always loaded+sticky so
+    % the operation is a no-op. Filter by FQN so other packages named
+    % 'mip' on different channels remain offered.
+    loadable  = bare_names(installedFqns(~strcmp(installedFqns, mipFqn)));
+    loaded    = bare_names(loadedFqns(~strcmp(loadedFqns, mipFqn)));
+
+    json = build_signatures(installed, loadable, loaded, pinned);
 
     jsonPath = fullfile(targetResourcesDir, 'functionSignatures.json');
     fid = fopen(jsonPath, 'w');
@@ -62,7 +70,7 @@ function names = bare_names(fqns)
 end
 
 
-function json = build_signatures(installed, loaded, pinned)
+function json = build_signatures(installed, loadable, loaded, pinned)
 % Emit a JSON object with one "mip" signature per subcommand. MATLAB's
 % function-signature format explicitly supports duplicate top-level keys
 % for functions with multiple syntaxes.
@@ -74,7 +82,7 @@ function json = build_signatures(installed, loaded, pinned)
     lines = {'{', '  "_schemaVersion": "1.0.0"'};
     for i = 1:numel(subcommands)
         cmd = subcommands{i};
-        sig = signature_for(cmd, installed, loaded, pinned, subcommands);
+        sig = signature_for(cmd, installed, loadable, loaded, pinned, subcommands);
         lines{end+1} = ','; %#ok<AGROW>
         lines{end+1} = sprintf('  "mip": %s', sig); %#ok<AGROW>
     end
@@ -83,12 +91,16 @@ function json = build_signatures(installed, loaded, pinned)
 end
 
 
-function sig = signature_for(cmd, installed, loaded, pinned, subcommands)
+function sig = signature_for(cmd, installed, loadable, loaded, pinned, subcommands)
     inputs = { command_arg(cmd) };
 
     switch cmd
-        case {'load','uninstall','pin','update','compile','test','info'}
+        case 'load'
+            inputs{end+1} = pkg_arg(loadable);
+        case {'uninstall','pin','update'}
             inputs{end+1} = pkg_arg(installed);
+        case {'compile','test','info'}
+            inputs{end+1} = choices_arg('package', 'required', installed);
         case 'unload'
             inputs{end+1} = pkg_arg(loaded);
         case 'unpin'
