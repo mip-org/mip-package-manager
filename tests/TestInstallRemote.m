@@ -464,6 +464,32 @@ classdef TestInstallRemote < matlab.unittest.TestCase
             assert(isobject(cleanupScratch) && isobject(cleanupCwd));
         end
 
+        %% --- Re-installing a transitive dep promotes it to directly_installed ---
+
+        function testInstallAlreadyInstalledDep_MarksDirectlyInstalled(testCase)
+            mip.install('--channel', 'mip-org/test-channel1', 'gamma');
+
+            directlyInstalled = mip.state.get_directly_installed();
+            testCase.verifyFalse( ...
+                ismember('gh/mip-org/test-channel1/alpha', directlyInstalled));
+
+            mip.install('mip-org/test-channel1/alpha');
+
+            directlyInstalled = mip.state.get_directly_installed();
+            testCase.verifyTrue( ...
+                ismember('gh/mip-org/test-channel1/alpha', directlyInstalled));
+        end
+
+        function testUninstallParent_PreservesExplicitlyInstalledDep(testCase)
+            mip.install('--channel', 'mip-org/test-channel1', 'gamma');
+            mip.install('mip-org/test-channel1/alpha');
+            mip.uninstall('mip-org/test-channel1/gamma');
+
+            alphaDir = fullfile(testCase.TestRoot, 'packages', ...
+                'gh', 'mip-org', 'test-channel1', 'alpha');
+            testCase.verifyTrue(exist(alphaDir, 'dir') > 0);
+        end
+
         function testInstall_BareNameWithVersionFailureHintsLiteralAtDir(testCase)
             % If 'foo@1.0' fails on the channel and both 'foo@1.0' and
             % 'foo' exist as directories, the hint should prefer the exact
