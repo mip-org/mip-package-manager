@@ -672,6 +672,14 @@ function installFromUrlFlag(args, zipUrl, editable, noCompile)
               pkgName);
     end
 
+    % Require HTTPS. A plain http:// fetch lets a network attacker swap
+    % the archive contents, and the unzipped tree is added to the path
+    % on load — i.e. persistent code execution.
+    if startsWith(zipUrl, 'http://')
+        error('mip:install:requireHttps', ...
+              '--url must use https://, not http://. Got: %s', zipUrl);
+    end
+
     % If the URL is a File Exchange landing page, resolve it to the
     % underlying .zip download URL. The resolved URL (with query string
     % stripped) is what gets baked into the generated mip.yaml.
@@ -823,14 +831,15 @@ function zipUrl = resolveFileExchangeUrl(fexUrl)
 end
 
 function tf = isZipUrl(url)
-% Return true if url is an http(s) URL whose path component ends in .zip
+% Return true if url is an https:// URL whose path component ends in .zip
 % (case-insensitive). The path component is everything before the first
-% '?' (query) or '#' (fragment).
+% '?' (query) or '#' (fragment). Plain http:// is rejected — see the
+% requireHttps check in installFromUrlFlag.
     if ~ischar(url) && ~isstring(url)
         tf = false; return;
     end
     url = char(url);
-    if ~startsWith(url, 'http://') && ~startsWith(url, 'https://')
+    if ~startsWith(url, 'https://')
         tf = false;
         return
     end
