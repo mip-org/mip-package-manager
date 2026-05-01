@@ -42,15 +42,8 @@ classdef TestCompareVersions < matlab.unittest.TestCase
         end
 
         function testMasterOutranksOtherName(testCase)
-            testCase.verifyEqual(mip.resolve.compare_versions('master', 'unspecified'), 1);
-            testCase.verifyEqual(mip.resolve.compare_versions('unspecified', 'master'), -1);
-        end
-
-        function testUnspecifiedIsOrdinaryName(testCase)
-            % 'unspecified' has no special tier; it sorts alphabetically
-            % with other named versions ('dev' < 'unspecified' so 'dev' ranks higher)
-            testCase.verifyEqual(mip.resolve.compare_versions('dev', 'unspecified'), 1);
-            testCase.verifyEqual(mip.resolve.compare_versions('unspecified', 'dev'), -1);
+            testCase.verifyEqual(mip.resolve.compare_versions('master', 'zeta'), 1);
+            testCase.verifyEqual(mip.resolve.compare_versions('zeta', 'master'), -1);
         end
 
         function testEqualNamed(testCase)
@@ -72,11 +65,11 @@ classdef TestCompareVersions < matlab.unittest.TestCase
         end
 
         function testSortAmongMixedTiers(testCase)
-            versions = {'dev', 'main', '1.0', 'master', '2.0', 'unspecified'};
+            versions = {'dev', 'main', '1.0', 'master', '2.0', 'zeta'};
             sorted = sortVersions(versions);
-            % Lowest -> highest: unspecified, dev (other names, alphabetical-first
+            % Lowest -> highest: zeta, dev (other names, alphabetical-first
             % ranks higher), then master, main, then numeric
-            testCase.verifyEqual(sorted, {'unspecified', 'dev', 'master', 'main', '1.0', '2.0'});
+            testCase.verifyEqual(sorted, {'zeta', 'dev', 'master', 'main', '1.0', '2.0'});
         end
 
     end
