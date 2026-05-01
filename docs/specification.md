@@ -635,7 +635,7 @@ Packages can be **pinned** to block all `mip update` paths from upgrading them; 
 ### 7.1 Update Flow (`mip update X Y Z`)
 
 1. Parse `--force`, `--all`, `--deps`, and `--no-compile` flags.
-2. If `--all` is specified, expand the argument list to all installed packages, then drop any pinned packages from the batch (a "Skipping pinned package" message is printed for each). `--force` does **not** override the pin filter (see [§7.11](#711-pinned-packages)). If every installed package is pinned, a message is printed and `mip update --all` returns without error. Otherwise (no `--all`), if any explicitly named package is pinned, raise `mip:update:pinned` before any other work; the user must `mip unpin <pkg>` first. If `--deps` is specified, expand each package's installed transitive dependencies into the argument list, dropping any pinned dependencies with a "Skipping pinned dependency" message.
+2. If `--all` is specified, expand the argument list to all installed packages, then drop any pinned packages from the batch (a "Skipping pinned package" message is printed for each). `--force` does **not** override the pin filter (see [§7.11](#711-pinned-packages)). If every installed package is pinned, a message is printed and `mip update --all` returns without error. Otherwise (no `--all`), drop any explicitly named pinned packages from the batch with a "Skipping pinned package" message; the unpinned named packages still update. The user must `mip unpin <pkg>` first to update a pinned package. If every named package is pinned, the call returns without error. If `--deps` is specified, expand each remaining package's installed transitive dependencies into the argument list, dropping any pinned dependencies with a "Skipping pinned dependency" message.
 3. Resolve each argument to a `(fqn, org, channel, name, pkgDir, pkgInfo, isLocal, sourcePath, editable, noSource)` tuple. Validation errors are raised **before** any destructive action:
    - Not installed → `mip:update:notInstalled`.
    - Local package whose `source_path` is non-empty but points to a missing directory → `mip:update:sourceNotFound`.
@@ -743,13 +743,13 @@ Removes a pin. Each argument is resolved against installed packages; not-install
 
 A pin blocks every `mip update` invocation from upgrading the pinned package. The only way to update a pinned package is to `mip unpin <pkg>` first; `--force` does not override the pin.
 
-- **`mip update <name>`** (explicit, with or without `--force`): if `<name>` is pinned, raise `mip:update:pinned` before any other work. The error message instructs the user to run `mip unpin <name>` first.
+- **`mip update <name>`** (explicit, with or without `--force`): if `<name>` is pinned, it is dropped from the batch with a "Skipping pinned package" message that points the user at `mip unpin <name>`. Other (unpinned) named packages in the same call still update. If every named package is pinned, the call returns without error.
 - **`mip update --all`** (with or without `--force`): pinned packages are dropped from the batch with a "Skipping pinned package" message. If every installed package is pinned, the command prints a message and returns. See [§7.1](#71-update-flow-mip-update-x-y-z).
-- **`mip update --deps <name>`**: if `<name>` itself is pinned, raise `mip:update:pinned` (same as the explicit-name rule). Pinned dependencies surfaced by the `--deps` expansion are dropped with a "Skipping pinned dependency" message and are not updated.
+- **`mip update --deps <name>`**: if `<name>` itself is pinned, it is dropped from the batch with the same "Skipping pinned package" message as the explicit-name rule (its dependencies are not expanded). Pinned dependencies surfaced by the `--deps` expansion of unpinned named packages are dropped with a "Skipping pinned dependency" message and are not updated.
 - **`mip uninstall <name>`**: the pin for `<name>` is cleared automatically so a reinstall starts unpinned.
 - **`mip list`**: pinned packages display a `[pinned]` marker alongside any other markers (`[sticky]`, `[editable]`, etc.).
 
-The `mip-org/core/mip` identity is not special-cased: it can be pinned and unpinned like any other package. `mip update mip` is treated as an explicit named update for pin purposes — if `mip` is pinned, the self-update flow ([§7.7](#77-self-update-mip-update-mip)) is blocked by the same `mip:update:pinned` error.
+The `mip-org/core/mip` identity is not special-cased: it can be pinned and unpinned like any other package. `mip update mip` is treated as an explicit named update for pin purposes — if `mip` is pinned, it is skipped from the batch with the same "Skipping pinned package" message rather than running the self-update flow ([§7.7](#77-self-update-mip-update-mip)).
 
 ### 7.12 Build Matching (`match_build`)
 

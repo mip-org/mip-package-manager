@@ -90,12 +90,21 @@ function update(varargin)
         end
         args = filtered;
     else
-        % Explicitly named packages: error immediately if any are
-        % pinned. The user must "mip unpin <pkg>" first; --force does
-        % not override the pin.
+        % Explicitly named packages: skip pinned packages with a
+        % "Skipping" message rather than erroring on the whole batch,
+        % so that "mip update X Y Z" with Y pinned still updates X and
+        % Z. The user must "mip unpin Y" first to update it; --force
+        % does not override the pin.
+        filtered = {};
         for i = 1:length(args)
-            errorIfPinned(args{i});
+            if ~warnIfPinned(args{i})
+                filtered{end+1} = args{i}; %#ok<AGROW>
+            end
         end
+        if isempty(filtered)
+            return
+        end
+        args = filtered;
     end
 
     if isempty(args)
@@ -669,16 +678,19 @@ function expanded = expandWithDeps(args)
     end
 end
 
-function errorIfPinned(packageArg)
-% Raise an error if the given package is installed and pinned. Users
-% must "mip unpin <pkg>" before updating; --force does not override.
+function tf = warnIfPinned(packageArg)
+% If the given package is installed and pinned, print a "Skipping pinned
+% package" message and return true (caller should drop it from the
+% batch). Otherwise return false. Users must "mip unpin <pkg>" first;
+% --force does not override the pin.
     r = mip.resolve.resolve_to_installed(packageArg);
     if isempty(r) || ~mip.state.is_pinned(r.fqn)
+        tf = false;
         return
     end
     displayFqn = mip.parse.display_fqn(r.fqn);
-    error('mip:update:pinned', ...
-          ['Package "%s" is pinned and will not be updated. ' ...
-           'Run "mip unpin %s" first to allow updates.'], ...
-          displayFqn, displayFqn);
+    fprintf(['Skipping pinned package "%s". ' ...
+             'Run "mip unpin %s" first to allow updates.\n'], ...
+            displayFqn, displayFqn);
+    tf = true;
 end

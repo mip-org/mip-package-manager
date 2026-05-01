@@ -169,58 +169,59 @@ classdef TestPinPackage < matlab.unittest.TestCase
             testCase.verifyTrue(mip.state.is_pinned('mip-org/core/alpha'));
         end
 
-        %% --- Named update is blocked by pin ---
+        %% --- Named update skips pinned with a message ---
 
-        function testUpdateNamed_PinnedErrors(testCase)
-            % mip update <pkg> on a pinned package errors.
+        function testUpdateNamed_PinnedSkipped(testCase)
+            % mip update <pkg> on a pinned package prints a skip message
+            % and returns without error. The pin is preserved.
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
             mip.pin('mip-org/core/alpha');
-            testCase.verifyError(@() mip.update('mip-org/core/alpha'), ...
-                'mip:update:pinned');
-            % Pin is preserved
+            output = evalc('mip.update(''mip-org/core/alpha'')');
+            testCase.verifyTrue(contains(output, 'Skipping pinned package'));
+            testCase.verifyTrue(contains(output, 'mip-org/core/alpha'));
             testCase.verifyTrue(mip.state.is_pinned('mip-org/core/alpha'));
         end
 
-        function testUpdateNamed_PinnedBareNameErrors(testCase)
-            % mip update <bare> on a pinned package errors after resolving.
+        function testUpdateNamed_PinnedBareNameSkipped(testCase)
+            % mip update <bare> on a pinned package skips it after resolving.
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
             mip.pin('mip-org/core/alpha');
-            testCase.verifyError(@() mip.update('alpha'), ...
-                'mip:update:pinned');
+            output = evalc('mip.update(''alpha'')');
+            testCase.verifyTrue(contains(output, 'Skipping pinned package'));
+            testCase.verifyTrue(contains(output, 'mip-org/core/alpha'));
         end
 
-        function testUpdateNamed_PinnedForceErrors(testCase)
+        function testUpdateNamed_PinnedForceSkipped(testCase)
             % --force does not override the pin on a named update.
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
             mip.pin('mip-org/core/alpha');
-            testCase.verifyError(@() mip.update('--force', 'mip-org/core/alpha'), ...
-                'mip:update:pinned');
-            % Pin is preserved
+            output = evalc('mip.update(''--force'', ''mip-org/core/alpha'')');
+            testCase.verifyTrue(contains(output, 'Skipping pinned package'));
             testCase.verifyTrue(mip.state.is_pinned('mip-org/core/alpha'));
         end
 
-        function testUpdateNamed_PinnedErrorMessageMentionsUnpin(testCase)
-            % Error message should tell the user how to unpin.
+        function testUpdateNamed_PinnedSkipMessageMentionsUnpin(testCase)
+            % Skip message should tell the user how to unpin.
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
             mip.pin('mip-org/core/alpha');
-            try
-                mip.update('mip-org/core/alpha');
-                testCase.verifyFail('Expected an error.');
-            catch ME
-                testCase.verifyEqual(ME.identifier, 'mip:update:pinned');
-                testCase.verifyTrue(contains(ME.message, 'unpin'));
-                testCase.verifyTrue(contains(ME.message, 'mip-org/core/alpha'));
-            end
+            output = evalc('mip.update(''mip-org/core/alpha'')');
+            testCase.verifyTrue(contains(output, 'unpin'));
+            testCase.verifyTrue(contains(output, 'mip-org/core/alpha'));
         end
 
-        function testUpdateNamed_OnePinnedAmongManyErrors(testCase)
-            % If any explicit package is pinned, the whole batch errors
-            % before any work is done.
+        function testUpdateNamed_AllPinnedSkippedReturnsCleanly(testCase)
+            % If every explicit package is pinned, all are skipped and
+            % the call returns without error.
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'beta');
+            mip.pin('mip-org/core/alpha');
             mip.pin('mip-org/core/beta');
-            testCase.verifyError(@() mip.update('mip-org/core/alpha', 'mip-org/core/beta'), ...
-                'mip:update:pinned');
+            output = evalc('mip.update(''mip-org/core/alpha'', ''mip-org/core/beta'')');
+            testCase.verifyTrue(contains(output, 'mip-org/core/alpha'));
+            testCase.verifyTrue(contains(output, 'mip-org/core/beta'));
+            testCase.verifyEqual(length(strfind(output, 'Skipping pinned package')), 2);
+            testCase.verifyTrue(mip.state.is_pinned('mip-org/core/alpha'));
+            testCase.verifyTrue(mip.state.is_pinned('mip-org/core/beta'));
         end
 
         %% --- --deps drops pinned deps ---
@@ -240,15 +241,19 @@ classdef TestPinPackage < matlab.unittest.TestCase
             testCase.verifyTrue(mip.state.is_pinned('mip-org/core/alpha'));
         end
 
-        function testUpdateDeps_PinnedExplicitErrors(testCase)
-            % mip update --deps X where X itself is pinned errors before
-            % any expansion or work.
+        function testUpdateDeps_PinnedExplicitSkipped(testCase)
+            % mip update --deps X where X itself is pinned: X is skipped
+            % with the same "Skipping pinned package" message as the
+            % non-deps path. With no other named packages, the call
+            % returns without error.
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
             createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'gamma', ...
                 'dependencies', {'mip-org/core/alpha'});
             mip.pin('mip-org/core/gamma');
-            testCase.verifyError(@() mip.update('--deps', 'mip-org/core/gamma'), ...
-                'mip:update:pinned');
+            output = evalc('mip.update(''--deps'', ''mip-org/core/gamma'')');
+            testCase.verifyTrue(contains(output, 'Skipping pinned package'));
+            testCase.verifyTrue(contains(output, 'mip-org/core/gamma'));
+            testCase.verifyTrue(mip.state.is_pinned('mip-org/core/gamma'));
         end
 
         %% --- State helper edge cases ---
