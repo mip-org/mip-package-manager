@@ -45,6 +45,13 @@ classdef TestInstallMhl < matlab.unittest.TestCase
     methods (Test)
 
         function testInstallMhlAlreadyInstalled_MarksDirectlyInstalled(testCase)
+            % When `mip install <pkg>.mhl` hits the early-return "already
+            % installed" path, it should still mark the package as directly
+            % installed. We bundle a source package, install it from the
+            % .mhl, then manually remove it from directly_installed (this
+            % simulates the bug scenario where the package is on disk but
+            % only as a transitive dep). Re-installing from the same .mhl
+            % must promote it back into directly_installed.
             srcDir = createTestSourcePackage(testCase.SourceDir, 'mypkg');
             mip.bundle(srcDir, '--output', testCase.OutputDir, '--arch', 'any');
             mhlFiles = dir(fullfile(testCase.OutputDir, '*.mhl'));

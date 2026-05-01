@@ -467,6 +467,10 @@ classdef TestInstallRemote < matlab.unittest.TestCase
         %% --- Re-installing a transitive dep promotes it to directly_installed ---
 
         function testInstallAlreadyInstalledDep_MarksDirectlyInstalled(testCase)
+            % Installing gamma pulls in alpha as a transitive dep, so alpha
+            % is on disk but not in directly_installed. A subsequent explicit
+            % `mip install alpha` should promote alpha to directly_installed
+            % even though nothing new gets downloaded.
             mip.install('--channel', 'mip-org/test-channel1', 'gamma');
 
             directlyInstalled = mip.state.get_directly_installed();
@@ -481,6 +485,9 @@ classdef TestInstallRemote < matlab.unittest.TestCase
         end
 
         function testUninstallParent_PreservesExplicitlyInstalledDep(testCase)
+            % End-to-end check for issue #224: after explicitly installing a
+            % package that was already on disk as a transitive dep,
+            % uninstalling the parent must not prune the now-explicit dep.
             mip.install('--channel', 'mip-org/test-channel1', 'gamma');
             mip.install('mip-org/test-channel1/alpha');
             mip.uninstall('mip-org/test-channel1/gamma');
