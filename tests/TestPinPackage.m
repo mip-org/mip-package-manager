@@ -153,6 +153,104 @@ classdef TestPinPackage < matlab.unittest.TestCase
             testCase.verifyTrue(contains(output, 'All packages are pinned'));
         end
 
+        function testUpdateAllForce_StillSkipsPinned(testCase)
+            % mip update --all --force should still skip pinned packages.
+            % --force does not override the pin.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha', ...
+                'version', '1.0.0');
+            mip.state.add_directly_installed('mip-org/core/alpha');
+            mip.pin('mip-org/core/alpha');
+
+            output = evalc('mip.update(''--all'', ''--force'')');
+            testCase.verifyTrue(contains(output, 'Skipping pinned package'));
+            testCase.verifyTrue(contains(output, 'mip-org/core/alpha'));
+            testCase.verifyTrue(contains(output, 'All packages are pinned'));
+            % Pin is preserved
+            testCase.verifyTrue(mip.state.is_pinned('mip-org/core/alpha'));
+        end
+
+        %% --- Named update is blocked by pin ---
+
+        function testUpdateNamed_PinnedErrors(testCase)
+            % mip update <pkg> on a pinned package errors.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
+            mip.pin('mip-org/core/alpha');
+            testCase.verifyError(@() mip.update('mip-org/core/alpha'), ...
+                'mip:update:pinned');
+            % Pin is preserved
+            testCase.verifyTrue(mip.state.is_pinned('mip-org/core/alpha'));
+        end
+
+        function testUpdateNamed_PinnedBareNameErrors(testCase)
+            % mip update <bare> on a pinned package errors after resolving.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
+            mip.pin('mip-org/core/alpha');
+            testCase.verifyError(@() mip.update('alpha'), ...
+                'mip:update:pinned');
+        end
+
+        function testUpdateNamed_PinnedForceErrors(testCase)
+            % --force does not override the pin on a named update.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
+            mip.pin('mip-org/core/alpha');
+            testCase.verifyError(@() mip.update('--force', 'mip-org/core/alpha'), ...
+                'mip:update:pinned');
+            % Pin is preserved
+            testCase.verifyTrue(mip.state.is_pinned('mip-org/core/alpha'));
+        end
+
+        function testUpdateNamed_PinnedErrorMessageMentionsUnpin(testCase)
+            % Error message should tell the user how to unpin.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
+            mip.pin('mip-org/core/alpha');
+            try
+                mip.update('mip-org/core/alpha');
+                testCase.verifyFail('Expected an error.');
+            catch ME
+                testCase.verifyEqual(ME.identifier, 'mip:update:pinned');
+                testCase.verifyTrue(contains(ME.message, 'unpin'));
+                testCase.verifyTrue(contains(ME.message, 'mip-org/core/alpha'));
+            end
+        end
+
+        function testUpdateNamed_OnePinnedAmongManyErrors(testCase)
+            % If any explicit package is pinned, the whole batch errors
+            % before any work is done.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'beta');
+            mip.pin('mip-org/core/beta');
+            testCase.verifyError(@() mip.update('mip-org/core/alpha', 'mip-org/core/beta'), ...
+                'mip:update:pinned');
+        end
+
+        %% --- --deps drops pinned deps ---
+
+        function testUpdateDeps_PinnedDependencyIsSkipped(testCase)
+            % mip update --deps X where X has a pinned dependency Y:
+            % Y is dropped from the expansion with a message; X still updates.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'gamma', ...
+                'dependencies', {'mip-org/core/alpha'});
+            mip.pin('mip-org/core/alpha');
+
+            output = evalc('try; mip.update(''--deps'', ''mip-org/core/gamma''); catch ME; disp(ME.message); end');
+            testCase.verifyTrue(contains(output, 'Skipping pinned dependency'));
+            testCase.verifyTrue(contains(output, 'mip-org/core/alpha'));
+            % Pin is preserved
+            testCase.verifyTrue(mip.state.is_pinned('mip-org/core/alpha'));
+        end
+
+        function testUpdateDeps_PinnedExplicitErrors(testCase)
+            % mip update --deps X where X itself is pinned errors before
+            % any expansion or work.
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'alpha');
+            createTestPackage(testCase.TestRoot, 'mip-org', 'core', 'gamma', ...
+                'dependencies', {'mip-org/core/alpha'});
+            mip.pin('mip-org/core/gamma');
+            testCase.verifyError(@() mip.update('--deps', 'mip-org/core/gamma'), ...
+                'mip:update:pinned');
+        end
+
         %% --- State helper edge cases ---
 
         function testIsPinned_FalseWhenEmpty(testCase)

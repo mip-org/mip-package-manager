@@ -74,30 +74,36 @@ function update(varargin)
             fprintf('No packages installed.\n');
             return
         end
-        % Skip pinned packages unless --force is set
-        if ~force
-            filtered = {};
-            for i = 1:length(allInstalled)
-                if mip.state.is_pinned(allInstalled{i})
-                    fprintf('Skipping pinned package "%s".\n', mip.parse.display_fqn(allInstalled{i}));
-                else
-                    filtered{end+1} = allInstalled{i}; %#ok<AGROW>
-                end
+        % Pinned packages are always skipped, even with --force. To
+        % update a pinned package, run "mip unpin <pkg>" first.
+        filtered = {};
+        for i = 1:length(allInstalled)
+            if mip.state.is_pinned(allInstalled{i})
+                fprintf('Skipping pinned package "%s".\n', mip.parse.display_fqn(allInstalled{i}));
+            else
+                filtered{end+1} = allInstalled{i}; %#ok<AGROW>
             end
-            allInstalled = filtered;
         end
-        if isempty(allInstalled)
+        if isempty(filtered)
             fprintf('All packages are pinned. Nothing to update.\n');
             return
         end
-        args = allInstalled;
+        args = filtered;
+    else
+        % Explicitly named packages: error immediately if any are
+        % pinned. The user must "mip unpin <pkg>" first; --force does
+        % not override the pin.
+        for i = 1:length(args)
+            errorIfPinned(args{i});
+        end
     end
 
     if isempty(args)
         error('mip:update:noPackage', 'At least one package name is required for update command.');
     end
 
-    % --deps: expand the argument list with each package's dependencies
+    % --deps: expand the argument list with each package's dependencies.
+    % Pinned dependencies are dropped from the expansion with a message.
     if updateDeps
         args = expandWithDeps(args);
     end
@@ -230,12 +236,6 @@ function update(varargin)
             if exist(backupDir, 'dir')
                 rmdir(backupDir, 's');
             end
-
-            % Unpin if this was a forced update of a pinned package
-            if force && mip.state.is_pinned(p.fqn)
-                mip.state.remove_pinned(p.fqn);
-                fprintf('Unpinned "%s".\n', displayFqn);
-            end
         end
 
         % --- Remote packages: update via staging, install missing deps, prune ---
@@ -252,12 +252,6 @@ function update(varargin)
                     mip.unload(p.fqn);
                 end
                 downloadAndReplace(p);
-
-                % Unpin if this was a forced update of a pinned package
-                if force && mip.state.is_pinned(p.fqn)
-                    mip.state.remove_pinned(p.fqn);
-                    fprintf('Unpinned "%s".\n', displayFqn);
-                end
             end
 
             % Install any missing dependencies that the updated packages require
@@ -650,7 +644,9 @@ end
 function expanded = expandWithDeps(args)
 % Expand a list of package arguments to include their installed
 % dependencies (recursively). The original packages come first, followed
-% by any dependencies not already in the list.
+% by any dependencies not already in the list. Pinned dependencies are
+% dropped from the expansion with a message — only explicitly named
+% packages can hit the pin error path.
 
     expanded = args;
     for i = 1:length(args)
@@ -661,9 +657,28 @@ function expanded = expandWithDeps(args)
         end
         deps = mip.dependency.find_all_dependencies(r.fqn);
         for j = 1:length(deps)
-            if mip.state.is_installed(deps{j}) && ~any(strcmp(expanded, deps{j}))
-                expanded{end+1} = deps{j}; %#ok<AGROW>
+            if ~mip.state.is_installed(deps{j}) || any(strcmp(expanded, deps{j}))
+                continue
             end
+            if mip.state.is_pinned(deps{j})
+                fprintf('Skipping pinned dependency "%s".\n', mip.parse.display_fqn(deps{j}));
+                continue
+            end
+            expanded{end+1} = deps{j}; %#ok<AGROW>
         end
     end
+end
+
+function errorIfPinned(packageArg)
+% Raise an error if the given package is installed and pinned. Users
+% must "mip unpin <pkg>" before updating; --force does not override.
+    r = mip.resolve.resolve_to_installed(packageArg);
+    if isempty(r) || ~mip.state.is_pinned(r.fqn)
+        return
+    end
+    displayFqn = mip.parse.display_fqn(r.fqn);
+    error('mip:update:pinned', ...
+          ['Package "%s" is pinned and will not be updated. ' ...
+           'Run "mip unpin %s" first to allow updates.'], ...
+          displayFqn, displayFqn);
 end
