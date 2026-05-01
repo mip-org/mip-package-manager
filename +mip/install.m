@@ -108,6 +108,11 @@ function install(varargin)
     for i = 1:length(args)
         pkg = char(args{i});
         if endsWith(pkg, '.mhl') || startsWith(pkg, 'http://') || startsWith(pkg, 'https://')
+            if isFileExchangeUrl(pkg)
+                error('mip:install:fexRequiresName', ...
+                      ['To install a package from the File Exchange, you must specify a package name using the syntax\n' ...
+                       '   mip install <name> --url <url>']);
+            end
             mhlSources{end+1} = pkg; %#ok<AGROW>
         elseif isLocalPathArg(pkg)
             localPaths{end+1} = pkg; %#ok<AGROW>
@@ -412,17 +417,22 @@ function installedFqns = installFromRepository(repoPackages, channel, markDirect
             rethrow(ME);
         end
 
-        % Mark requested packages as directly installed and collect their FQNs.
-        % Skip marking when this call is installing transitive dependencies
-        % (e.g. from an .mhl install) so those deps can be pruned later.
         for i = 1:length(resolvedPackages)
             s = resolvedPackages{i};
-            if markDirectlyInstalled
-                mip.state.add_directly_installed(s.fqn);
-            end
             if ismember(s.fqn, toInstallFqns)
                 installedFqns{end+1} = s.fqn; %#ok<AGROW>
             end
+        end
+    end
+
+    % Mark requested packages as directly installed. Runs whether or not
+    % anything new was downloaded, so that re-installing a package that
+    % was previously pulled in as a transitive dep promotes it. Skipped
+    % when this call is installing transitive dependencies (e.g. from an
+    % .mhl install) so those deps can be pruned later.
+    if markDirectlyInstalled
+        for i = 1:length(resolvedPackages)
+            mip.state.add_directly_installed(resolvedPackages{i}.fqn);
         end
     end
 
@@ -526,6 +536,7 @@ function installedFqn = installFromMhl(mhlSource, ~, channel)
         pkgDir = mip.paths.get_package_dir(fqn);
         if exist(pkgDir, 'dir')
             fprintf('Package "%s" is already installed\n', mip.parse.display_fqn(fqn));
+            mip.state.add_directly_installed(fqn);
             return
         end
 
