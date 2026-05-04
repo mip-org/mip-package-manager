@@ -589,12 +589,13 @@ After unloading (and pruning), the system checks all still-loaded packages. If a
    - FQN arguments: used directly.
    - Bare names: uses `find_all_installed_by_name` (section 2.4.3). If ambiguous, refuses.
 2. If `mip-org/core/mip` is among the resolved packages, dispatch to the self-uninstall flow ([§6.4](#64-self-uninstall-mip-uninstall-mip)). If the user confirms, that flow tears down the entire mip root (removing all installed packages along with mip itself) and returns; no further per-package processing happens. If the user declines, `mip-org/core/mip` is dropped from the list and normal uninstallation continues for any other packages.
-3. Unload any packages that are currently loaded.
-4. Remove each package directory (`rmdir`).
-5. Remove from `directly_installed.txt`.
-6. Clear the pin entry for the package, if any (so a reinstall starts unpinned -- see [§7.11](#711-pinned-packages)).
-7. Clean up empty parent directories (channel dir, then org dir).
-8. **Prune** packages that are no longer needed.
+3. Walk the resolved packages in argument order, running each package's full lifecycle before moving on to the next. The per-package output for one package therefore appears as a contiguous block, not interleaved with the next:
+   - Unload it if it is currently loaded.
+   - Remove its directory (`rmdir`).
+   - Remove it from `directly_installed.txt`.
+   - Clear its pin entry, if any (so a reinstall starts unpinned -- see [§7.11](#711-pinned-packages)).
+   - Clean up empty parent directories (channel dir, then org dir).
+4. After the per-package walk, **prune** packages that are no longer needed and check for broken dependencies among the remaining installed packages. These two operations are batched at the end because they depend on the post-uninstall on-disk state of every package in the batch.
 
 ### 6.2 Dependency Pruning After Uninstall
 
@@ -621,7 +622,7 @@ When `mip-org/core/mip` is among the resolved uninstall targets, the command del
 1. Print a warning describing what will happen (remove mip from the saved MATLAB path, unload and delete all installed packages, delete the mip root directory).
 2. Prompt the user for confirmation (`y`/`yes` to proceed). The prompt is skipped if the environment variable `MIP_CONFIRM` is set.
 3. If the user declines, the self-uninstall is aborted. `mip uninstall` then drops `mip-org/core/mip` from its argument list and proceeds normally with any remaining packages.
-4. If the user confirms, mip runs `mip.reset()`, removes `<MIP_ROOT>/packages/mip-org/core/mip/mip` from the saved MATLAB path (via `path(pathdef)` + `rmpath` + `savepath`, with the live path restored and then re-pruned for the current session), and deletes the entire mip root directory (`rmdir(mip.root(), 's')`).
+4. If the user confirms, mip runs `mip.reset()`, removes `<MIP_ROOT>/packages/mip-org/core/mip/mip` from the saved MATLAB path (via `path(pathdef)` + `rmpath` + `savepath`, with the live path restored and then re-pruned for the current session), and deletes the entire mip root directory (`rmdir(mip.paths.root(), 's')`).
 5. A reinstall hint is printed.
 
 If the packages directory is missing when self-uninstall is invoked, the flow raises `mip:uninstall:corrupted` and aborts without touching anything.
@@ -651,12 +652,16 @@ Packages can be **pinned** to block all `mip update` paths from upgrading them; 
      - Same version **and** same commit hash (or no hash available): "already up to date", skip.
      - Same version but different commit hash: update (content changed within the same version).
      - Different version: update.
-7. If no packages need updating, return. Otherwise:
-   - Snapshot `MIP_LOADED_PACKAGES` and `MIP_DIRECTLY_LOADED_PACKAGES`.
+7. Snapshot `MIP_LOADED_PACKAGES` and `MIP_DIRECTLY_LOADED_PACKAGES`, then walk the batch in argument order, running each package's full lifecycle (skip messages, "Checking for updates" output, download/replace, etc.) before moving on to the next package. The per-package output for one package therefore appears as a contiguous block, not interleaved with the next.
+   - **Pinned packages** (named explicitly): print "Skipping pinned package …" and continue.
+   - **No-source local packages** (`source_path` absent or empty): print "Skipping … no local source to update from." and continue.
    - **Local packages** are updated via backup-and-restore: unload if loaded, move the old directory to a temporary backup, `remove_directly_installed`, then `mip.build.install_local(sourcePath, editable, noCompile)`. If `install_local` fails, the backup is moved back and `directly_installed` is restored. They do **not** go through `mip.uninstall` because the prune step would remove their deps, which `install_local` cannot re-fetch from a channel.
-   - **Remote packages** are updated via staging: unload if loaded, download and extract the new version to a temporary staging directory, then move the old directory to a backup and move the staged version into place. If the swap fails, the backup is restored. The old package is never destroyed until the new version is fully in place. The `directly_installed.txt` entry is preserved (no removal/re-addition). Then install any missing dependencies that the updated packages require, and prune any orphaned packages.
+   - **Remote packages** are updated via staging: fetch the channel index and run the up-to-date check ([§7.1.1](#711-target-version-selection-for-update)); if the package is up to date, continue. Otherwise unload if loaded, download and extract the new version to a temporary staging directory, then move the old directory to a backup and move the staged version into place. If the swap fails, the backup is restored. The old package is never destroyed until the new version is fully in place. The `directly_installed.txt` entry is preserved (no removal/re-addition).
+   - After the per-package walk, install any missing dependencies that the updated remote packages now require, and prune any orphaned packages. These two operations are batched at the end of the walk because they depend on the post-update on-disk state of every updated package.
    - Reload every package in the pre-update `MIP_LOADED_PACKAGES` snapshot that is not currently loaded and whose directory exists. Packages that were in the snapshot but are no longer installed are skipped with a warning.
    - Restore `MIP_DIRECTLY_LOADED_PACKAGES` to the pre-update snapshot (filtered to entries that are actually loaded now) so that packages which were only transitively loaded before the update remain only transitively loaded after.
+
+Because the up-to-date check now runs inside the per-package walk, a `mip:update:notInIndex`, `mip:update:unavailable`, or `mip:update:versionNotInChannel` failure raised for a later package no longer short-circuits the whole batch — earlier packages may already have been replaced on disk. The `try/catch` + reload safety net (see [§7.8](#78-load-state-preservation)) still guarantees that successfully-updated packages are reloaded before the original error is re-raised.
 
 #### 7.1.1 Target Version Selection for Update
 
@@ -796,9 +801,11 @@ This guarantees an exact architecture match is always preferred over `any`, rega
 
 Lists all installed packages. Default sort is by reverse load order (most recently loaded first). `--sort-by-name` sorts alphabetically. Status markers shown per package: `[sticky]` ([§4.2](#42-the---sticky-flag)), `[pinned]` ([§7.11](#711-pinned-packages)), and `[editable: <source>]` ([§3.2.2](#322-editable-install--e----editable)). An asterisk (`*`) marks directly loaded packages.
 
-### 9.2 `mip info <package>`
+### 9.2 `mip info [<package>]`
 
-Displays information about a package from two sources:
+With no arguments, prints mip's own version (from `mip.yaml`), the resolved mip root directory (see [§11.5](#115-mip_root-environment-variable)), and the current architecture tag (see [§12](#12-architecture-detection)).
+
+With a package name, displays information about that package from two sources:
 
 **Local Installation section:**
 - Version, path, loaded status, dependencies, editable flag, source path.
@@ -821,21 +828,13 @@ Lists packages available in the channel index. Uses `--channel` to specify which
 
 Prints the mip version string, read from `mip.yaml` in the package root. If `mip.yaml`'s `version` is blank or missing, an empty string is printed (see [§11.2](#112-mipyaml-schema)).
 
-### 9.5 `mip index`
-
-Prints the channel index URL. Takes an optional channel argument (default: `mip-org/core`). The URL follows the pattern `https://<org>.github.io/mip-<channel>/index.json`.
-
-### 9.6 `mip root`
-
-Prints the mip root directory path. See [§11.5](#115-mip_root-environment-variable) for resolution rules.
-
-### 9.7 `mip reset`
+### 9.5 `mip reset`
 
 Resets mip to a clean state:
 1. Runs `mip unload --all --force` (unloads everything except `mip-org/core/mip`).
 2. Removes all in-memory key-value stores (`MIP_LOADED_PACKAGES`, `MIP_DIRECTLY_LOADED_PACKAGES`, `MIP_STICKY_PACKAGES`).
 
-### 9.8 `mip bundle <path>`
+### 9.6 `mip bundle <path>`
 
 Builds a `.mhl` archive from a local package directory containing `mip.yaml`. Options:
 - `--output <dir>` -- output directory (default: current directory)
@@ -843,11 +842,11 @@ Builds a `.mhl` archive from a local package directory containing `mip.yaml`. Op
 
 Output filename: `<name>-<version>-<architecture>.mhl`. Because `-` is the field separator in this scheme, any `-` in the canonical package name is encoded as `_` in the filename only (e.g. `foo-bar` version `1.0` on `linux_x86_64` becomes `foo_bar-1.0-linux_x86_64.mhl`). The canonical name is preserved verbatim inside the bundled `mip.json`, and name normalization ([§1.8](#18-name-equivalence)) treats `-` and `_` as equivalent, so this encoding is transparent at install time. The **version** string, by contrast, is written verbatim; versions containing `-` (e.g. `1.0-beta`) are not encoded and will produce an ambiguous-looking filename. Nothing in mip currently parses the filename back out (installs read `mip.json` for the canonical metadata), so the ambiguity is cosmetic, but package authors should prefer dot-separated versions. See [§11.3](#113-mhl-file-format) for the archive format.
 
-### 9.9 `mip test <package>`
+### 9.7 `mip test <package>`
 
 Loads the package (if not already loaded) and runs its `test_script` (defined in `mip.yaml`). If no test script is defined, prints a message and returns.
 
-### 9.10 `mip init`
+### 9.8 `mip init`
 
 Scaffolds a new mip package by generating a `mip.yaml` in a target directory.
 
@@ -856,8 +855,8 @@ mip init [<path>] [--name <packagename>] [--repository <url>]
 ```
 
 - **`<path>`** (optional positional) -- directory to initialize. Defaults to the current directory (`.`) when omitted. Must already exist; otherwise raises `mip:init:notADirectory`.
-- **`--name <packagename>`** (optional) -- overrides the default package name. When omitted, the name defaults to the target directory's basename. Names must match the regex `^[a-zA-Z0-9]([-a-zA-Z0-9_]*[a-zA-Z0-9])?$` (letters/digits/hyphens/underscores, starting and ending with a letter or digit); otherwise raises `mip:init:invalidName` with a hint to use `--name` to override.
-- **`--repository <url>`** (optional) -- fills in the generated `mip.yaml`'s `repository` field. Omit to leave it blank.
+- **`--name <packagename>`** (optional) -- overrides the default package name. When omitted, the name defaults to the git repo name (if a `.git/config` is detected -- see below) and otherwise to the target directory's basename. The default is lowercased before validation; an explicit `--name` is not. Names must match the regex `^[a-zA-Z0-9]([-a-zA-Z0-9_]*[a-zA-Z0-9])?$` (letters/digits/hyphens/underscores, starting and ending with a letter or digit); otherwise raises `mip:init:invalidName` with a hint to use `--name` to override.
+- **`--repository <url>`** (optional) -- fills in the generated `mip.yaml`'s `repository` field. When omitted, the field is auto-filled from `.git/config` if a remote URL is detected (see below) and is otherwise left blank.
 
 Behavior:
 
@@ -865,8 +864,9 @@ Behavior:
 2. `paths` is auto-populated by walking the directory and identifying folders that contain runtime MATLAB code. The walk happens **before** the placeholder test script is created, so the root is not auto-included just because of that new file.
 3. A blank `test_<name>.m` is created at the target root (unless one already exists), and the generated `mip.yaml`'s `test_script` field points at it.
 4. Other optional string fields (`description`, `version`, `license`, `homepage`) are emitted blank for the user to fill in. A single `builds: [{ architectures: [any] }]` entry is emitted.
+5. If `<path>/.git/config` exists, it is parsed directly (no `git` shellout) for `[remote "<name>"] url = ...` entries. The URL of `[remote "origin"]` is used if present; otherwise the first remote in file order. The repo name is derived by stripping a trailing `.git` from the URL and taking the last `/`- or `:`-delimited segment, so `https://`, `ssh://`, and `git@host:owner/repo` forms all work. The URL is preserved verbatim (with any `.git` suffix) when written to the `repository` field. If no `.git/config` is found, no remotes are configured, or the file cannot be parsed, both fields fall back to their non-git defaults. Auto-detection only inspects `<path>/.git/`; parent directories are not searched, so a sub-package inside a larger git repo will not pick up the outer repo's URL.
 
-`mip init` also runs automatically on behalf of local installs that are missing a `mip.yaml` (after the user confirms the prompt -- see [§3.2](#32-local-installation)) and on URL-based installs that land on a source tree with no `mip.yaml` (see [§3.4](#34-installation-from-a-remote-zip-url)).
+`mip init` also runs automatically on behalf of local installs that are missing a `mip.yaml` (after the user confirms the prompt -- see [§3.2](#32-local-installation)) and on URL-based installs that land on a source tree with no `mip.yaml` (see [§3.4](#34-installation-from-a-remote-zip-url)). The local-install auto-invocation passes no flags, so the git-config auto-detection applies normally. The URL-based auto-invocation passes `--name` and `--repository` explicitly (the resolved zip URL), so the git-config auto-detection has no effect there.
 
 Error identifiers: `mip:init:notADirectory`, `mip:init:invalidName`, `mip:init:missingNameValue`, `mip:init:missingRepositoryValue`, `mip:init:unexpectedArg`, `mip:init:writeFailed`.
 
@@ -1029,12 +1029,12 @@ After removing a package, empty channel and org directories are cleaned up:
 
 ### 11.5 `MIP_ROOT` Environment Variable
 
-The `MIP_ROOT` environment variable overrides the location of the mip root directory. When set, it is validated by [`mip.root()`](../+mip/root.m) according to these rules:
+The `MIP_ROOT` environment variable overrides the location of the mip root directory. When set, it is validated by [`mip.paths.root()`](../+mip/+paths/root.m) according to these rules:
 
-- **Unset**: `mip.root()` first tries path-based detection (navigating up from the installed `+mip/root.m` location, assuming `<root>/packages/mip-org/core/mip/mip/+mip/root.m`). If the inferred root has no `packages/` subdir (typical for an editable source checkout, where `root.m` resolves to the working tree rather than an installed location), it falls back to `<userpath>/mip`. If **that** also lacks a `packages/` subdir, `mip.root()` raises `mip:rootNotFound` with a hint suggesting the user `setenv('MIP_ROOT', ...)` explicitly.
-- **Set to empty string** (`""`): treated the same as unset. `getenv` returns `''` for both unset and empty values, and `mip.root()` makes no attempt to distinguish them.
+- **Unset**: `mip.paths.root()` first tries path-based detection (navigating up from the installed `+mip/+paths/root.m` location, assuming `<root>/packages/mip-org/core/mip/mip/+mip/+paths/root.m`). If the inferred root has no `packages/` subdir (typical for an editable source checkout, where `root.m` resolves to the working tree rather than an installed location), it falls back to `<userpath>/mip`. If **that** also lacks a `packages/` subdir, `mip.paths.root()` raises `mip:rootNotFound` with a hint suggesting the user `setenv('MIP_ROOT', ...)` explicitly.
+- **Set to empty string** (`""`): treated the same as unset. `getenv` returns `''` for both unset and empty values, and `mip.paths.root()` makes no attempt to distinguish them.
 - **Set to a path that does not exist or is not a directory**: raises `mip:rootInvalid`.
-- **Set to an existing directory that does not contain a `packages/` subdirectory**: raises `mip:rootInvalid`. `mip.root()` does **not** auto-create `packages/`. The use case for `MIP_ROOT` is pointing at an existing mip installation, so a missing `packages/` indicates a misconfiguration rather than a fresh setup.
+- **Set to an existing directory that does not contain a `packages/` subdirectory**: raises `mip:rootInvalid`. `mip.paths.root()` does **not** auto-create `packages/`. The use case for `MIP_ROOT` is pointing at an existing mip installation, so a missing `packages/` indicates a misconfiguration rather than a fresh setup.
 
 ### 11.6 Channel Index Cache
 
@@ -1051,7 +1051,7 @@ Channel index downloads are cached on disk under `<root>/cache/index/<org>/<chan
 
 ## 12. Architecture Detection
 
-`mip.arch()` returns a tag based on the platform:
+`mip.build.arch()` returns a tag based on the platform:
 
 | Platform | Tag |
 |---|---|
@@ -1064,7 +1064,7 @@ Channel index downloads are cached on disk under `<root>/cache/index/<org>/<chan
 | MATLAB Numerics macOS x86_64 | `numbl_macos_x86_64` |
 | MATLAB Numerics WASM/Browser | `numbl_wasm` |
 
-`mip.arch()` itself only performs **detection** and always returns the exact platform tag (e.g. `numbl_linux_x86_64`). The `numbl_wasm` tag serves as a cross-`numbl_*` fallback during **variant selection** (see [§3.1.4](#314-architecture-selection-select_best_variant)), not at detection time.
+`mip.build.arch()` itself only performs **detection** and always returns the exact platform tag (e.g. `numbl_linux_x86_64`). The `numbl_wasm` tag serves as a cross-`numbl_*` fallback during **variant selection** (see [§3.1.4](#314-architecture-selection-select_best_variant)), not at detection time.
 
 ---
 

@@ -29,7 +29,7 @@ try
     index = mip.channel.fetch_index(channel, true);
 
     % Get current architecture
-    currentArch = mip.arch();
+    currentArch = mip.build.arch();
 
     % Find all packages compatible with current architecture
     packages = index.packages;
